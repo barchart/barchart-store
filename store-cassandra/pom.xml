@@ -1,0 +1,132 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>com.barchart.base</groupId>
+		<artifactId>barchart-archon</artifactId>
+		<version>2.5.12</version>
+		<relativePath />
+	</parent>
+
+	<groupId>com.barchart.store</groupId>
+	<artifactId>store-cassandra</artifactId>
+	<version>3.0.0-SNAPSHOT</version>
+	<packaging>bundle</packaging>
+
+	<description>
+<![CDATA[
+### ${project.artifactId}
+
+Cassandra data store implementation and OSGI components
+]]>
+	</description>
+
+	<scm>
+		<url>https://github.com/barchart/barchart-store</url>
+		<connection>scm:git:git://github.com/barchart/barchart-store.git</connection>
+		<developerConnection>scm:git:ssh://git@github.com/barchart/barchart-store.git</developerConnection>
+		<tag>master</tag>
+	</scm>
+
+	<properties>
+		<projectJavaVersion>1.7</projectJavaVersion>
+	</properties>
+
+	<dependencies>
+
+		<dependency>
+			<groupId>com.barchart.store</groupId>
+			<artifactId>store-api</artifactId>
+			<version>[2.0-SNAPSHOT,2.1-SNAPSHOT)</version>
+		</dependency>
+
+		<!-- Astyanax Wrapped for OSGi -->
+		<dependency>
+			<groupId>com.barchart.wrap</groupId>
+			<artifactId>barchart-wrap-astyanax</artifactId>
+			<version>1.56.42-build003</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.barchart.util</groupId>
+			<artifactId>barchart-util-test</artifactId>
+			<version>[3,4-SNAPSHOT)</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- logging -->
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<scope>test</scope>
+		</dependency>
+		
+	</dependencies>
+
+	<profiles>
+
+		<!-- Semantic version check against baseline. -->
+		<profile>
+			<id>semantic-version</id>
+			<activation>
+				<file>
+					<missing>disable-semantic-version.md</missing>
+				</file>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.aries.versioning</groupId>
+						<artifactId>org.apache.aries.versioning.plugin</artifactId>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+
+	</profiles>
+
+	<build>
+		<pluginManagement>
+			<plugins>
+				<!--This plugin's configuration is used to store Eclipse m2e settings 
+					only. It has no influence on the Maven build itself. -->
+				<plugin>
+					<groupId>org.eclipse.m2e</groupId>
+					<artifactId>lifecycle-mapping</artifactId>
+					<version>1.0.0</version>
+					<configuration>
+						<lifecycleMappingMetadata>
+							<pluginExecutions>
+								<pluginExecution>
+									<pluginExecutionFilter>
+										<groupId>
+											com.carrotgarden.maven
+										</groupId>
+										<artifactId>
+											carrot-maven-scr-plugin
+										</artifactId>
+										<versionRange>
+											[3.0.3,)
+										</versionRange>
+										<goals>
+											<goal>generate</goal>
+										</goals>
+									</pluginExecutionFilter>
+									<action>
+										<ignore />
+									</action>
+								</pluginExecution>
+							</pluginExecutions>
+						</lifecycleMappingMetadata>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+</project>
