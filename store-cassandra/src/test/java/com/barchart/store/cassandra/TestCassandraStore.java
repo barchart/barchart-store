@@ -10,6 +10,7 @@ import java.util.concurrent.Callable;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import rx.Observer;
@@ -19,9 +20,9 @@ import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreRow;
 import com.barchart.store.api.StoreService.Table;
-import com.barchart.store.cassandra.CassandraStore;
 import com.barchart.util.test.concurrent.CallableTest;
 
+@Ignore
 public class TestCassandraStore {
 
 	private static final String KEYSPACE = "cs_unit_test";
