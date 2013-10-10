@@ -45,7 +45,7 @@ Cassandra data store implementation and OSGI components
 		<dependency>
 			<groupId>com.barchart.wrap</groupId>
 			<artifactId>barchart-wrap-astyanax</artifactId>
-			<version>1.56.42-build003</version>
+			<version>[1.56.42-build003,1.56.43-SNAPSHOT)</version>
 		</dependency>
 
 		<dependency>
