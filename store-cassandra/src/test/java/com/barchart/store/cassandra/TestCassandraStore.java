@@ -10,19 +10,19 @@ import java.util.concurrent.Callable;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import rx.Observer;
 
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.ColumnDef;
+import com.barchart.store.api.ObservableIndexQueryBuilder.Operator;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreRow;
 import com.barchart.store.api.StoreService.Table;
 import com.barchart.util.test.concurrent.CallableTest;
 
-@Ignore
+//@Ignore
 public class TestCassandraStore {
 
 	private static final String KEYSPACE = "cs_unit_test";
@@ -277,19 +277,37 @@ public class TestCassandraStore {
 				return String.class;
 			}
 
+		}, new ColumnDef() {
+
+			@Override
+			public String key() {
+				return "num";
+			}
+
+			@Override
+			public boolean isIndexed() {
+				return true;
+			}
+
+			@Override
+			public Class<?> type() {
+				return Integer.class;
+			}
+
 		});
 
 		Thread.sleep(100);
 
 		final Batch batch = store.batch(KEYSPACE);
 		for (int i = 1; i < 1000; i++) {
-			batch.row(TABLE, "test-" + i).set("field", "value-" + (i % 100));
+			batch.row(TABLE, "test-" + i).set("field", "value-" + (i % 100))
+					.set("num", i);
 		}
 		batch.commit();
 
 		Thread.sleep(1000);
 
-		store.query(KEYSPACE, TABLE, "field", "value-50").build()
+		store.query(KEYSPACE, TABLE).where("field", "value-50").build()
 				.subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
@@ -302,12 +320,43 @@ public class TestCassandraStore {
 		assertEquals(null, observer.error);
 		assertEquals(10, observer.rows.size());
 
+		observer.reset();
+
+		store.query(KEYSPACE, TABLE).where("field", "value-50")
+				.where("num", 50).build().subscribe(observer);
+
+		CallableTest.waitFor(new Callable<Boolean>() {
+			@Override
+			public Boolean call() throws Exception {
+				return observer.completed;
+			}
+		}, 5000);
+
+		assertEquals(null, observer.error);
+		assertEquals(1, observer.rows.size());
+
+		observer.reset();
+
+		store.query(KEYSPACE, TABLE).where("field", "value-50")
+				.where("num", 500, Operator.LT).build().subscribe(observer);
+
+		CallableTest.waitFor(new Callable<Boolean>() {
+			@Override
+			public Boolean call() throws Exception {
+				return observer.completed;
+			}
+		}, 5000);
+
+		assertEquals(null, observer.error);
+		assertEquals(5, observer.rows.size());
+
 	}
 
 	@Before
 	public void setUp() throws Exception {
 		observer = new TestObserver();
 		store = new CassandraStore();
+		store.setCredentials("cassandra", "Erpe5PXRQmG1gVOpnvmiEwNjqCz3Qw3o");
 		store.connect();
 		try {
 			store.delete(KEYSPACE);
@@ -348,7 +397,6 @@ public class TestCassandraStore {
 		@Override
 		public void onNext(final StoreRow<String> row) {
 			rows.add(row);
-			System.out.println(row);
 		}
 
 		public void reset() {

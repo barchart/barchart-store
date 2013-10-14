@@ -1,9 +1,11 @@
 package com.barchart.store.cassandra;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -16,6 +18,8 @@ import rx.util.functions.Func1;
 
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.ColumnDef;
+import com.barchart.store.api.ObservableIndexQueryBuilder;
+import com.barchart.store.api.ObservableIndexQueryBuilder.Operator;
 import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreColumn;
@@ -47,6 +51,7 @@ import com.netflix.astyanax.model.Row;
 import com.netflix.astyanax.model.Rows;
 import com.netflix.astyanax.query.AllRowsQuery;
 import com.netflix.astyanax.query.ColumnFamilyQuery;
+import com.netflix.astyanax.query.IndexOperationExpression;
 import com.netflix.astyanax.query.IndexQuery;
 import com.netflix.astyanax.query.IndexValueExpression;
 import com.netflix.astyanax.query.RowQuery;
@@ -450,10 +455,9 @@ public class CassandraStore implements StoreService {
 	}
 
 	@Override
-	public <K, V> ObservableQueryBuilder<K> query(final String database,
-			final Table<K, V> table, final K column, final Object value)
-			throws Exception {
-		return new CassandraSearchQuery<K>(database, table, column, value);
+	public <K, V> ObservableIndexQueryBuilder<K> query(final String database,
+			final Table<K, V> table) throws Exception {
+		return new CassandraSearchQuery<K>(database, table);
 	}
 
 	private class CassandraBatchMutator implements Batch {
@@ -937,20 +941,43 @@ public class CassandraStore implements StoreService {
 		}
 	}
 
-	private class CassandraSearchQuery<T> extends CassandraBaseRowQuery<T> {
+	private class ValueCompare {
+		public Operator operator;
+		public Object value;
 
-		private final T column;
-		private final Object value;
+		public ValueCompare(final Operator operator_, final Object value_) {
+			operator = operator_;
+			value = value_;
+		}
+	}
+
+	private class CassandraSearchQuery<T> extends CassandraBaseRowQuery<T>
+			implements ObservableIndexQueryBuilder<T> {
+
+		Map<T, List<ValueCompare>> filters;
 
 		private CassandraSearchQuery(final String database_,
-				final Table<T, ?> table_, final T column_, final Object value_)
-				throws ConnectionException {
-
+				final Table<T, ?> table_) throws ConnectionException {
 			super(database_, table_);
+			filters = new HashMap<T, List<ValueCompare>>();
+		}
 
-			column = column_;
-			value = value_;
+		@Override
+		public ObservableIndexQueryBuilder<T> where(final T column,
+				final Object value) {
+			return where(column, value, Operator.EQUAL);
+		}
 
+		@Override
+		public ObservableIndexQueryBuilder<T> where(final T column,
+				final Object value, final Operator operator) {
+			List<ValueCompare> list = filters.get(column);
+			if (list == null) {
+				list = new ArrayList<ValueCompare>();
+				filters.put(column, list);
+			}
+			list.add(new ValueCompare(operator, value));
+			return this;
 		}
 
 		@Override
@@ -968,20 +995,72 @@ public class CassandraStore implements StoreService {
 				final int batchSize) {
 
 			IndexQuery<String, T> rowQuery = query.searchWithIndex();
-			final IndexValueExpression<String, T> exp =
-					rowQuery.addExpression().whereColumn(column).equals();
-			if (value instanceof Boolean) {
-				rowQuery = exp.value((Boolean) value);
-			} else if (value instanceof byte[]) {
-				rowQuery = exp.value((byte[]) value);
-			} else if (value instanceof Integer) {
-				rowQuery = exp.value((Integer) value);
-			} else if (value instanceof Double) {
-				rowQuery = exp.value((Double) value);
-			} else if (value instanceof Long) {
-				rowQuery = exp.value((Long) value);
-			} else if (value instanceof String) {
-				rowQuery = exp.value((String) value);
+
+			boolean validQuery = filters.size() > 0 ? false : true;
+			outerloop: for (final Map.Entry<T, List<ValueCompare>> entry : filters
+					.entrySet()) {
+				// Cassandra secondary index queries require at least one EQUAL
+				// clause to run for some reason
+				for (final ValueCompare vc : entry.getValue()) {
+					if (vc.operator == Operator.EQUAL) {
+						validQuery = true;
+						break outerloop;
+					}
+				}
+			}
+
+			if (!validQuery) {
+				throw new IllegalArgumentException(
+						"Secondary index queries require at least one EQUAL term");
+			}
+
+			for (final Map.Entry<T, List<ValueCompare>> entry : filters
+					.entrySet()) {
+
+				for (final ValueCompare vc : entry.getValue()) {
+
+					final IndexOperationExpression<String, T> ops =
+							rowQuery.addExpression()
+									.whereColumn(entry.getKey());
+
+					final IndexValueExpression<String, T> exp;
+
+					switch (vc.operator) {
+						case GT:
+							exp = ops.greaterThan();
+							break;
+						case GTE:
+							exp = ops.greaterThanEquals();
+							break;
+						case LT:
+							exp = ops.lessThan();
+							break;
+						case LTE:
+							exp = ops.lessThanEquals();
+							break;
+						case EQUAL:
+						default:
+							exp = ops.equals();
+					}
+
+					final Object value = vc.value;
+
+					if (value instanceof Boolean) {
+						rowQuery = exp.value((Boolean) value);
+					} else if (value instanceof byte[]) {
+						rowQuery = exp.value((byte[]) value);
+					} else if (value instanceof Integer) {
+						rowQuery = exp.value((Integer) value);
+					} else if (value instanceof Double) {
+						rowQuery = exp.value((Double) value);
+					} else if (value instanceof Long) {
+						rowQuery = exp.value((Long) value);
+					} else if (value instanceof String) {
+						rowQuery = exp.value((String) value);
+					}
+
+				}
+
 			}
 
 			if (columns != null) {

@@ -20,7 +20,8 @@ public interface ObservableQueryBuilder<T> {
 
 	ObservableQueryBuilder<T> prefix(String prefix);
 
-	ObservableQueryBuilder<T> columns(@SuppressWarnings("unchecked") T... columns);
+	ObservableQueryBuilder<T> columns(
+			@SuppressWarnings("unchecked") T... columns);
 
 	/*
 	 * Fetch all matching rows

@@ -70,8 +70,8 @@ public interface StoreService {
 
 	// Search index for column value
 
-	<K, V> ObservableQueryBuilder<K> query(String database, Table<K, V> table,
-			K column, Object value) throws Exception;
+	<K, V> ObservableIndexQueryBuilder<K> query(String database,
+			Table<K, V> table) throws Exception;
 
 	// Table definition
 
