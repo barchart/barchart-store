@@ -316,7 +316,7 @@ public class CassandraStore implements StoreService {
 		} else if (cls == Boolean.class) {
 			return "BooleanType";
 		} else if (cls == Date.class) {
-			return "DateTime";
+			return "DateType";
 		} else if (cls == Double.class) {
 			return "DoubleType";
 		} else if (cls == ByteBuffer.class) {
@@ -324,7 +324,7 @@ public class CassandraStore implements StoreService {
 		} else if (cls == byte[].class) {
 			return "BytesType";
 		} else if (cls == UUID.class) {
-			return "UUIDType";
+			return "TimeUUIDType";
 		}
 
 		throw new IllegalArgumentException();
@@ -341,7 +341,7 @@ public class CassandraStore implements StoreService {
 						.<String, Object> builder()
 						.put("default_validation_class",
 								validatorFor(table.defaultValueType))
-						.put("key_validation_class", keyValidator)
+						.put("key_validation_class", validatorFor(String.class))
 						.put("comparator_type", keyValidator);
 
 		if (columns != null && columns.length > 0) {

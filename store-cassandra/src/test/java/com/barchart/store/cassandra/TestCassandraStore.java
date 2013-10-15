@@ -6,11 +6,11 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import rx.Observer;
@@ -22,15 +22,18 @@ import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreRow;
 import com.barchart.store.api.StoreService.Table;
 import com.barchart.util.test.concurrent.CallableTest;
+import com.netflix.astyanax.serializers.UUIDSerializer;
+import com.netflix.astyanax.util.TimeUUIDUtils;
 
-@Ignore
+//@Ignore
 public class TestCassandraStore {
 
 	private static final String KEYSPACE = "cs_unit_test";
 	private static final Table<String, String> TABLE = Table
 			.make("cs_test_table");
 
-	private TestObserver observer;
+	private TestObserver<String> observer;
+	private TestObserver<UUID> uuidObserver;
 	private ExistsObserver existsObserver;
 	private CassandraStore store;
 
@@ -159,6 +162,41 @@ public class TestCassandraStore {
 		assertEquals(3, observer.rows.size());
 		assertEquals(observer.rows.get(1).get("column_key").getString(),
 				"column_value2");
+
+	}
+
+	@Test
+	public void testUUID() throws Exception {
+
+		final Table<UUID, String> table =
+				Table.make("cs_test_table", UUID.class, String.class);
+		store.create(KEYSPACE, table);
+
+		Thread.sleep(100);
+
+		final UUID uuid = TimeUUIDUtils.getUniqueTimeUUIDinMillis();
+
+		System.out.println(UUIDSerializer.get().toByteBuffer(uuid));
+
+		final Batch batch = store.batch(KEYSPACE);
+		batch.row(table, "test-1").set(uuid, "column_value");
+		batch.commit();
+
+		Thread.sleep(100);
+
+		store.fetch(KEYSPACE, table, "test-1").build().subscribe(uuidObserver);
+
+		CallableTest.waitFor(new Callable<Boolean>() {
+			@Override
+			public Boolean call() throws Exception {
+				return uuidObserver.completed;
+			}
+		});
+
+		assertEquals(null, uuidObserver.error);
+		assertEquals(1, uuidObserver.rows.size());
+		assertEquals(uuidObserver.rows.get(0).get(uuid).getString(),
+				"column_value");
 
 	}
 
@@ -395,7 +433,8 @@ public class TestCassandraStore {
 
 	@Before
 	public void setUp() throws Exception {
-		observer = new TestObserver();
+		observer = new TestObserver<String>();
+		uuidObserver = new TestObserver<UUID>();
 		existsObserver = new ExistsObserver();
 		store = new CassandraStore();
 		store.setCredentials("cassandra", "Erpe5PXRQmG1gVOpnvmiEwNjqCz3Qw3o");
@@ -403,7 +442,6 @@ public class TestCassandraStore {
 		try {
 			store.delete(KEYSPACE);
 		} catch (final Exception e) {
-			System.out.println("keyspace missing");
 		}
 		store.create(KEYSPACE);
 	}
@@ -413,17 +451,16 @@ public class TestCassandraStore {
 		try {
 			store.delete(KEYSPACE);
 		} catch (final Exception e) {
-			System.out.println("keyspace missing");
 		}
 		store.disconnect();
 		store = null;
 	}
 
-	private class TestObserver implements Observer<StoreRow<String>> {
+	private class TestObserver<T> implements Observer<StoreRow<T>> {
 
 		boolean completed = false;
 		Throwable error = null;
-		final List<StoreRow<String>> rows = new ArrayList<StoreRow<String>>();
+		final List<StoreRow<T>> rows = new ArrayList<StoreRow<T>>();
 
 		@Override
 		public void onCompleted() {
@@ -437,7 +474,7 @@ public class TestCassandraStore {
 		}
 
 		@Override
-		public void onNext(final StoreRow<String> row) {
+		public void onNext(final StoreRow<T> row) {
 			rows.add(row);
 		}
 
