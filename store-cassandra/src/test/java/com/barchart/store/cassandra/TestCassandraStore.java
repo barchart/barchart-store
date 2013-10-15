@@ -11,6 +11,7 @@ import java.util.concurrent.Callable;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import rx.Observer;
@@ -25,7 +26,7 @@ import com.barchart.util.test.concurrent.CallableTest;
 import com.netflix.astyanax.serializers.UUIDSerializer;
 import com.netflix.astyanax.util.TimeUUIDUtils;
 
-//@Ignore
+@Ignore
 public class TestCassandraStore {
 
 	private static final String KEYSPACE = "cs_unit_test";
