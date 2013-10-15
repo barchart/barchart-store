@@ -10,7 +10,6 @@ import java.util.concurrent.Callable;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import rx.Observer;
@@ -23,7 +22,7 @@ import com.barchart.store.api.StoreRow;
 import com.barchart.store.api.StoreService.Table;
 import com.barchart.util.test.concurrent.CallableTest;
 
-@Ignore
+//@Ignore
 public class TestCassandraStore {
 
 	private static final String KEYSPACE = "cs_unit_test";
@@ -31,6 +30,7 @@ public class TestCassandraStore {
 			.make("cs_test_table");
 
 	private TestObserver observer;
+	private ExistsObserver existsObserver;
 	private CassandraStore store;
 
 	@Test
@@ -50,6 +50,45 @@ public class TestCassandraStore {
 		store.delete(KEYSPACE, TABLE);
 		Thread.sleep(100);
 		assertFalse(store.has(KEYSPACE, TABLE));
+	}
+
+	@Test
+	public void testExistence() throws Exception {
+
+		store.create(KEYSPACE, TABLE);
+
+		final Batch batch = store.batch(KEYSPACE);
+		batch.row(TABLE, "test-1").set("column_key", "column_value");
+		batch.commit();
+
+		Thread.sleep(100);
+
+		existsObserver.reset();
+
+		store.exists(KEYSPACE, TABLE, "test-1").subscribe(existsObserver);
+
+		CallableTest.waitFor(new Callable<Boolean>() {
+			@Override
+			public Boolean call() throws Exception {
+				return existsObserver.completed;
+			}
+		});
+
+		assertEquals(true, existsObserver.exists);
+
+		existsObserver.reset();
+
+		store.exists(KEYSPACE, TABLE, "test-2").subscribe(existsObserver);
+
+		CallableTest.waitFor(new Callable<Boolean>() {
+			@Override
+			public Boolean call() throws Exception {
+				return existsObserver.completed;
+			}
+		});
+
+		assertEquals(false, existsObserver.exists);
+
 	}
 
 	@Test
@@ -356,6 +395,7 @@ public class TestCassandraStore {
 	@Before
 	public void setUp() throws Exception {
 		observer = new TestObserver();
+		existsObserver = new ExistsObserver();
 		store = new CassandraStore();
 		store.setCredentials("cassandra", "Erpe5PXRQmG1gVOpnvmiEwNjqCz3Qw3o");
 		store.connect();
@@ -404,6 +444,36 @@ public class TestCassandraStore {
 			completed = false;
 			error = null;
 			rows.clear();
+		}
+
+	}
+
+	private class ExistsObserver implements Observer<Boolean> {
+
+		boolean completed = false;
+		Throwable error = null;
+		boolean exists = true;
+
+		@Override
+		public void onCompleted() {
+			completed = true;
+		}
+
+		@Override
+		public void onError(final Throwable e) {
+			error = e;
+			completed = true;
+		}
+
+		@Override
+		public void onNext(final Boolean exists_) {
+			exists = exists_;
+		}
+
+		public void reset() {
+			completed = false;
+			error = null;
+			exists = true;
 		}
 
 	}

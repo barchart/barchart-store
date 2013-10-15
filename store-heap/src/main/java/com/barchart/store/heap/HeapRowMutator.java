@@ -37,6 +37,12 @@ public class HeapRowMutator<K> implements RowMutator<K> {
 	}
 
 	@Override
+	public RowMutator<K> set(final K column, final int value) throws Exception {
+		update.add(new HeapColumn<K>(column, value));
+		return this;
+	}
+
+	@Override
 	public RowMutator<K> set(final K column, final long value) throws Exception {
 		update.add(new HeapColumn<K>(column, value));
 		return this;

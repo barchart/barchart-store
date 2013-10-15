@@ -63,30 +63,35 @@ class HeapColumn<K> implements StoreColumn<K> {
 	protected void set(final double value) {
 		data = ByteBuffer.allocate(4);
 		data.putDouble(value);
+		data.flip();
 		timestamp = System.currentTimeMillis();
 	}
 
 	protected void set(final int value) {
 		data = ByteBuffer.allocate(4);
 		data.putInt(value);
+		data.flip();
 		timestamp = System.currentTimeMillis();
 	}
 
 	protected void set(final long value) {
 		data = ByteBuffer.allocate(8);
 		data.putLong(value);
+		data.flip();
 		timestamp = System.currentTimeMillis();
 	}
 
 	protected void set(final boolean value) {
 		data = ByteBuffer.allocate(1);
 		data.put(value ? (byte) 1 : (byte) 0);
+		data.flip();
 		timestamp = System.currentTimeMillis();
 	}
 
 	protected void set(final Date value) {
 		data = ByteBuffer.allocate(8);
 		data.putLong(value.getTime());
+		data.flip();
 		timestamp = System.currentTimeMillis();
 	}
 
@@ -109,7 +114,9 @@ class HeapColumn<K> implements StoreColumn<K> {
 		if (data == null) {
 			return null;
 		}
-		return UTF8.decode(data).toString();
+		final String value = UTF8.decode(data).toString();
+		data.rewind();
+		return value;
 	}
 
 	@Override
@@ -117,7 +124,9 @@ class HeapColumn<K> implements StoreColumn<K> {
 		if (data == null) {
 			return null;
 		}
-		return data.getDouble();
+		final double value = data.getDouble();
+		data.rewind();
+		return value;
 	}
 
 	@Override
@@ -125,7 +134,9 @@ class HeapColumn<K> implements StoreColumn<K> {
 		if (data == null) {
 			return null;
 		}
-		return data.getInt();
+		final int value = data.getInt();
+		data.rewind();
+		return value;
 	}
 
 	@Override
@@ -133,7 +144,9 @@ class HeapColumn<K> implements StoreColumn<K> {
 		if (data == null) {
 			return null;
 		}
-		return data.getLong();
+		final long value = data.getLong();
+		data.rewind();
+		return value;
 	}
 
 	@Override
@@ -146,7 +159,9 @@ class HeapColumn<K> implements StoreColumn<K> {
 		if (data == null) {
 			return null;
 		}
-		return data.get() == (byte) 1;
+		final boolean value = (data.get() == (byte) 1);
+		data.rewind();
+		return value;
 	}
 
 	@Override
@@ -154,7 +169,7 @@ class HeapColumn<K> implements StoreColumn<K> {
 		if (data == null) {
 			return null;
 		}
-		return new Date(data.getLong());
+		return new Date(getLong());
 	}
 
 	@Override

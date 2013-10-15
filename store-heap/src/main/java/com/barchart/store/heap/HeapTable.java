@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.barchart.store.api.ColumnDef;
+import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
 
 public class HeapTable<K, V> {
@@ -50,10 +51,9 @@ public class HeapTable<K, V> {
 
 	}
 
-	public ObservableQueryBuilder<K> query(final K column, final Object value)
-			throws Exception {
+	public ObservableIndexQueryBuilder<K> query() throws Exception {
 		// Unsupported operation, no indexes
-		return new HeapQueryBuilder<K>(Collections.<HeapRow<K>> emptySet());
+		return new HeapIndexQueryBuilder<K>(null);
 	}
 
 	protected HeapRow<K> remove(final String key) {

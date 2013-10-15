@@ -10,6 +10,8 @@ public interface RowMutator<T> {
 
 	RowMutator<T> set(T column, ByteBuffer value) throws Exception;
 
+	RowMutator<T> set(T column, int value) throws Exception;
+
 	RowMutator<T> set(T column, long value) throws Exception;
 
 	RowMutator<T> remove(T column) throws Exception;

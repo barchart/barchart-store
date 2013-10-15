@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.barchart.store.api.ColumnDef;
-import com.barchart.store.api.ObservableQueryBuilder;
+import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.google.common.collect.MapMaker;
 
 /**
@@ -39,18 +39,8 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 	}
 
 	@Override
-	public ObservableQueryBuilder<String> query(final String column,
-			final Object value) throws Exception {
-
-		final Collection<HeapRow<String>> matches =
-				indexes.get(column).get(value);
-
-		if (matches != null) {
-			return new HeapQueryBuilder<String>(matches);
-		}
-
-		return super.query(column, value);
-
+	public ObservableIndexQueryBuilder<String> query() throws Exception {
+		return new HeapIndexQueryBuilder<String>(indexes);
 	}
 
 	@Override
@@ -99,6 +89,7 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 		}
 
 		final ColumnDef def = columns.get(column.getName());
+
 		final Map<Object, Collection<HeapRow<String>>> idx =
 				indexes.get(column.getName());
 
@@ -116,11 +107,11 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 			if (type == String.class) {
 				addIndex(idx, column.getString(), row);
 			} else if (type == byte[].class) {
-				// TODO compare byte arrays
+				addIndex(idx, column.getBlob(), row);
 			} else if (type == Boolean.class) {
 				addIndex(idx, column.getBoolean(), row);
 			} else if (type == ByteBuffer.class) {
-				// TODO compare byte arrays
+				addIndex(idx, column.getBlob(), row);
 			} else if (type == Double.class) {
 				addIndex(idx, column.getDouble(), row);
 			} else if (type == Integer.class) {
@@ -132,6 +123,7 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 			}
 
 		} catch (final Exception e) {
+			e.printStackTrace();
 		}
 
 	}
@@ -144,6 +136,7 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 		}
 
 		final ColumnDef def = columns.get(column.getName());
+
 		final Map<Object, Collection<HeapRow<String>>> idx =
 				indexes.get(column.getName());
 
@@ -154,11 +147,11 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 			if (type == String.class) {
 				removeIndex(idx, column.getString(), row);
 			} else if (type == byte[].class) {
-				// TODO compare byte arrays
+				removeIndex(idx, column.getBlob(), row);
 			} else if (type == Boolean.class) {
 				removeIndex(idx, column.getBoolean(), row);
 			} else if (type == ByteBuffer.class) {
-				// TODO compare byte arrays
+				removeIndex(idx, column.getBlob(), row);
 			} else if (type == Double.class) {
 				removeIndex(idx, column.getDouble(), row);
 			} else if (type == Integer.class) {

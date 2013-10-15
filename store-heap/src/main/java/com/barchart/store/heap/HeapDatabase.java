@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.ColumnDef;
+import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreService.Table;
@@ -58,9 +59,9 @@ public class HeapDatabase {
 		return get(table).fetch(keys);
 	}
 
-	public <K, V> ObservableQueryBuilder<K> query(final Table<K, V> table,
-			final K column, final Object value) throws Exception {
-		return get(table).query(column, value);
+	public <K, V> ObservableIndexQueryBuilder<K> query(final Table<K, V> table)
+			throws Exception {
+		return get(table).query();
 	}
 
 	public Batch batch() {

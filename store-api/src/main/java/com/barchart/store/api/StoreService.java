@@ -1,5 +1,7 @@
 package com.barchart.store.api;
 
+import rx.Observable;
+
 /**
  * Schema management:
  * 
@@ -62,6 +64,11 @@ public interface StoreService {
 	// Batch row updates
 
 	Batch batch(String database) throws Exception;
+
+	// Check for existence of a key
+
+	<K, V> Observable<Boolean> exists(String database, Table<K, V> table,
+			String key) throws Exception;
 
 	// Fetch rows by key (or all keys)
 

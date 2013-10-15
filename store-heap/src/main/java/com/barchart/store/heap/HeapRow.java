@@ -77,4 +77,12 @@ public class HeapRow<K> implements StoreRow<K> {
 		columns.remove(name);
 	}
 
+	@Override
+	public boolean equals(final Object that) {
+		if (that instanceof HeapRow) {
+			return key.equals(((HeapRow<?>) that).key);
+		}
+		return false;
+	}
+
 }

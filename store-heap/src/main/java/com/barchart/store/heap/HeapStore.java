@@ -3,9 +3,16 @@ package com.barchart.store.heap;
 import java.util.HashMap;
 import java.util.Map;
 
+import rx.Observable;
+import rx.Observer;
+import rx.Subscription;
+import rx.util.functions.Func1;
+
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.ColumnDef;
+import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
+import com.barchart.store.api.StoreRow;
 import com.barchart.store.api.StoreService;
 
 public class HeapStore implements StoreService {
@@ -73,16 +80,76 @@ public class HeapStore implements StoreService {
 	}
 
 	@Override
+	public <K, V> Observable<Boolean> exists(final String database,
+			final Table<K, V> table, final String keys) throws Exception {
+
+		return Observable.create(new Func1<Observer<Boolean>, Subscription>() {
+
+			@Override
+			public Subscription call(final Observer<Boolean> observer) {
+
+				try {
+
+					final Subscription sub =
+							fetch(database, table, keys).build().subscribe(
+									new Observer<StoreRow<K>>() {
+
+										@Override
+										public void onCompleted() {
+											observer.onCompleted();
+										}
+
+										@Override
+										public void onError(final Throwable e) {
+											observer.onError(e);
+										}
+
+										@Override
+										public void onNext(final StoreRow<K> row) {
+											if (row.columns().size() > 0) {
+												observer.onNext(true);
+											} else {
+												observer.onNext(false);
+											}
+										}
+
+									});
+
+					return new Subscription() {
+						@Override
+						public void unsubscribe() {
+							sub.unsubscribe();
+						}
+					};
+
+				} catch (final Exception e) {
+
+					observer.onError(e);
+
+					return new Subscription() {
+						@Override
+						public void unsubscribe() {
+						}
+					};
+
+				}
+
+			}
+
+		});
+
+	}
+
+	@Override
 	public <K, V> ObservableQueryBuilder<K> fetch(final String database,
 			final Table<K, V> table, final String... keys) throws Exception {
 		return getDatabase(database).fetch(table, keys);
 	}
 
 	@Override
-	public <K, V> ObservableQueryBuilder<K> query(final String database,
-			final Table<K, V> table, final K column, final Object value)
-			throws Exception {
-		return getDatabase(database).query(table, column, value);
+	public <K, V> ObservableIndexQueryBuilder<K> query(final String database,
+			final Table<K, V> table) throws Exception {
+		return getDatabase(database).query(table);
 	}
 
 	@Override
