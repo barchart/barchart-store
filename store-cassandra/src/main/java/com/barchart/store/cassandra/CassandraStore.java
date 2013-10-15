@@ -64,7 +64,7 @@ import com.netflix.astyanax.serializers.DoubleSerializer;
 import com.netflix.astyanax.serializers.IntegerSerializer;
 import com.netflix.astyanax.serializers.LongSerializer;
 import com.netflix.astyanax.serializers.StringSerializer;
-import com.netflix.astyanax.serializers.UUIDSerializer;
+import com.netflix.astyanax.serializers.TimeUUIDSerializer;
 import com.netflix.astyanax.thrift.ThriftFamilyFactory;
 import com.netflix.astyanax.util.RangeBuilder;
 
@@ -298,7 +298,7 @@ public class CassandraStore implements StoreService {
 		} else if (cls == Date.class) {
 			return (Serializer<T>) DateSerializer.get();
 		} else if (cls == UUID.class) {
-			return (Serializer<T>) UUIDSerializer.get();
+			return (Serializer<T>) TimeUUIDSerializer.get();
 		}
 
 		throw new IllegalArgumentException();
