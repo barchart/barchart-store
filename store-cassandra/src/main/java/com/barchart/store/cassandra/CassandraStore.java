@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -81,6 +82,8 @@ public class CassandraStore implements StoreService {
 	private String strategyClass = "NetworkTopologyStrategy";
 	private String[] zones = { "chicago", "us-east-1" };
 	private int replicationFactor = 2;
+	private ConsistencyLevel readConsistency = ConsistencyLevel.CL_ONE;
+	private ConsistencyLevel writeConsistency = ConsistencyLevel.CL_ONE;
 
 	private String user = "cassandra";
 	private String password = "cassandra";
@@ -107,6 +110,14 @@ public class CassandraStore implements StoreService {
 
 	public void setReplicationFactor(final int factor_) {
 		replicationFactor = factor_;
+	}
+
+	public void setReadConsistency(final ConsistencyLevel level_) {
+		readConsistency = level_;
+	}
+
+	public void setWriteConsistency(final ConsistencyLevel level_) {
+		writeConsistency = level_;
 	}
 
 	public void setCredentials(final String user_, final String password_) {
@@ -279,7 +290,7 @@ public class CassandraStore implements StoreService {
 	}
 
 	@SuppressWarnings("unchecked")
-	private <T> Serializer<T> serializerFor(final Class<T> cls) {
+	private static <T> Serializer<T> serializerFor(final Class<T> cls) {
 
 		if (cls == String.class) {
 			return (Serializer<T>) StringSerializer.get();
@@ -371,16 +382,16 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private <T> StoreRow<T> wrapRow(final Row<String, T> row) {
+	private static <T> StoreRow<T> wrapRow(final Row<String, T> row) {
 		return wrapColumns(row.getKey(), row.getColumns());
 	}
 
-	private <T> StoreRow<T> wrapColumns(final String key,
+	private static <T> StoreRow<T> wrapColumns(final String key,
 			final ColumnList<T> columns) {
 		return new StoreRowImpl<T>(key, columns);
 	}
 
-	private class CassandraRowMutator<T> implements RowMutator<T> {
+	private static class CassandraRowMutator<T> implements RowMutator<T> {
 
 		private Integer ttl = null;
 		private ColumnListMutation<T> clm = null;
@@ -446,7 +457,7 @@ public class CassandraStore implements StoreService {
 	@Override
 	public Batch batch(final String keyspace) throws Exception {
 		return new CassandraBatchMutator(clusterContext.getClient()
-				.getKeyspace(keyspace).prepareMutationBatch());
+				.getKeyspace(keyspace).prepareMutationBatch(), writeConsistency);
 	}
 
 	@Override
@@ -514,27 +525,32 @@ public class CassandraStore implements StoreService {
 	public <K, V> ObservableQueryBuilder<K> fetch(final String database,
 			final Table<K, V> table, final String... keys) throws Exception {
 		if (keys == null || keys.length == 0) {
-			return new CassandraAllRowsQuery<K>(database, table);
+			return new CassandraAllRowsQuery<K>(database, table,
+					readConsistency, executor);
 		} else if (keys.length == 1) {
-			return new CassandraSingleRowQuery<K>(database, table, keys[0]);
+			return new CassandraSingleRowQuery<K>(database, table,
+					readConsistency, executor, keys[0]);
 		} else {
-			return new CassandraMultiRowQuery<K>(database, table, keys);
+			return new CassandraMultiRowQuery<K>(database, table,
+					readConsistency, executor, keys);
 		}
 	}
 
 	@Override
 	public <K, V> ObservableIndexQueryBuilder<K> query(final String database,
 			final Table<K, V> table) throws Exception {
-		return new CassandraSearchQuery<K>(database, table);
+		return new CassandraSearchQuery<K>(database, table, readConsistency,
+				executor);
 	}
 
-	private class CassandraBatchMutator implements Batch {
+	private static class CassandraBatchMutator implements Batch {
 
 		private MutationBatch m = null;
 
-		CassandraBatchMutator(final MutationBatch m) {
+		CassandraBatchMutator(final MutationBatch m,
+				final ConsistencyLevel level_) {
 			this.m = m;
-			this.m.setConsistencyLevel(ConsistencyLevel.CL_ONE);
+			this.m.setConsistencyLevel(level_);
 		}
 
 		@Override
@@ -646,17 +662,19 @@ public class CassandraStore implements StoreService {
 		}
 	}
 
-	private abstract class CassandraBaseRowQuery<T> implements
+	private static abstract class CassandraBaseRowQuery<T> implements
 			ObservableQueryBuilder<T> {
 
 		protected final Keyspace keyspace;
 		protected final ColumnFamilyQuery<String, T> query;
+		protected final Executor executor;
 
 		protected RangeBuilder columnRange = null;
 		protected T[] columns = null;
 
 		private CassandraBaseRowQuery(final String database_,
-				final Table<T, ?> table_) throws ConnectionException {
+				final Table<T, ?> table_, final ConsistencyLevel level_,
+				final Executor executor_) throws ConnectionException {
 
 			keyspace = clusterContext.getClient().getKeyspace(database_);
 
@@ -665,7 +683,9 @@ public class CassandraStore implements StoreService {
 							new ColumnFamily<String, T>(table_.name,
 									StringSerializer.get(),
 									serializerFor(table_.keyType)))
-							.setConsistencyLevel(ConsistencyLevel.CL_TWO);
+							.setConsistencyLevel(level_);
+
+			executor = executor_;
 
 		}
 
@@ -759,15 +779,17 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private class CassandraSingleRowQuery<T> extends CassandraBaseRowQuery<T> {
+	private static class CassandraSingleRowQuery<T> extends
+			CassandraBaseRowQuery<T> {
 
 		private final String key;
 
 		private CassandraSingleRowQuery(final String database_,
-				final Table<T, ?> table_, final String key_)
+				final Table<T, ?> table_, final ConsistencyLevel level_,
+				final Executor executor_, final String key_)
 				throws ConnectionException {
 
-			super(database_, table_);
+			super(database_, table_, level_, executor_);
 			key = key_;
 
 		}
@@ -795,7 +817,7 @@ public class CassandraStore implements StoreService {
 							// ListenableFuture<OperationResult<ColumnList<T>>>
 							// future = rowQuery.executeAsync();
 
-							executor.submit(new Runnable() {
+							executor.execute(new Runnable() {
 
 								@Override
 								public void run() {
@@ -840,15 +862,17 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private class CassandraMultiRowQuery<T> extends CassandraBaseRowQuery<T> {
+	private static class CassandraMultiRowQuery<T> extends
+			CassandraBaseRowQuery<T> {
 
 		private final String[] keys;
 
 		private CassandraMultiRowQuery(final String database_,
-				final Table<T, ?> table_, final String... keys_)
+				final Table<T, ?> table_, final ConsistencyLevel level_,
+				final Executor executor_, final String... keys_)
 				throws ConnectionException {
 
-			super(database_, table_);
+			super(database_, table_, level_, executor_);
 			keys = keys_;
 
 		}
@@ -878,7 +902,7 @@ public class CassandraStore implements StoreService {
 						public Subscription call(
 								final Observer<StoreRow<T>> observer) {
 
-							executor.submit(new Runnable() {
+							executor.execute(new Runnable() {
 
 								@Override
 								public void run() {
@@ -901,7 +925,7 @@ public class CassandraStore implements StoreService {
 									}
 								}
 
-							}, executor);
+							});
 
 							return new Subscription() {
 								@Override
@@ -924,12 +948,14 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private class CassandraAllRowsQuery<T> extends CassandraBaseRowQuery<T> {
+	private static class CassandraAllRowsQuery<T> extends
+			CassandraBaseRowQuery<T> {
 
 		private CassandraAllRowsQuery(final String database_,
-				final Table<T, ?> table_) throws ConnectionException {
+				final Table<T, ?> table_, final ConsistencyLevel level_,
+				final Executor executor_) throws ConnectionException {
 
-			super(database_, table_);
+			super(database_, table_, level_, executor_);
 
 		}
 
@@ -968,7 +994,7 @@ public class CassandraStore implements StoreService {
 						public Subscription call(
 								final Observer<StoreRow<T>> observer) {
 
-							executor.submit(new Runnable() {
+							executor.execute(new Runnable() {
 
 								@Override
 								public void run() {
@@ -993,7 +1019,7 @@ public class CassandraStore implements StoreService {
 									}
 								}
 
-							}, executor);
+							});
 
 							return new Subscription() {
 								@Override
@@ -1009,7 +1035,7 @@ public class CassandraStore implements StoreService {
 		}
 	}
 
-	private class ValueCompare {
+	private static class ValueCompare {
 		public Operator operator;
 		public Object value;
 
@@ -1019,14 +1045,15 @@ public class CassandraStore implements StoreService {
 		}
 	}
 
-	private class CassandraSearchQuery<T> extends CassandraBaseRowQuery<T>
-			implements ObservableIndexQueryBuilder<T> {
+	private static class CassandraSearchQuery<T> extends
+			CassandraBaseRowQuery<T> implements ObservableIndexQueryBuilder<T> {
 
 		Map<T, List<ValueCompare>> filters;
 
 		private CassandraSearchQuery(final String database_,
-				final Table<T, ?> table_) throws ConnectionException {
-			super(database_, table_);
+				final Table<T, ?> table_, final ConsistencyLevel level_,
+				final Executor executor_) throws ConnectionException {
+			super(database_, table_, level_, executor_);
 			filters = new HashMap<T, List<ValueCompare>>();
 		}
 
@@ -1152,7 +1179,7 @@ public class CassandraStore implements StoreService {
 						public Subscription call(
 								final Observer<StoreRow<T>> observer) {
 
-							executor.submit(new Runnable() {
+							executor.execute(new Runnable() {
 
 								@Override
 								public void run() {
@@ -1177,7 +1204,7 @@ public class CassandraStore implements StoreService {
 									}
 								}
 
-							}, executor);
+							});
 
 							return new Subscription() {
 								@Override

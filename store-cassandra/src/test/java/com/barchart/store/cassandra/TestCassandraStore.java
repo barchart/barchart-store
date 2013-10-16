@@ -1,17 +1,15 @@
 package com.barchart.store.cassandra;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.Ignore;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import rx.Observer;
@@ -23,54 +21,30 @@ import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreRow;
 import com.barchart.store.api.StoreService.Table;
 import com.barchart.util.test.concurrent.CallableTest;
-import com.netflix.astyanax.serializers.UUIDSerializer;
 import com.netflix.astyanax.util.TimeUUIDUtils;
 
-@Ignore
+// Tests should be reliable now on Jenkins
+//@Ignore
 public class TestCassandraStore {
 
-	private static final String KEYSPACE = "cs_unit_test";
-	private static final Table<String, String> TABLE = Table
-			.make("cs_test_table");
+	private static String keyspace;
+	private static CassandraStore store;
 
+	private Table<String, String> table;
 	private TestObserver<String> observer;
 	private TestObserver<UUID> uuidObserver;
 	private ExistsObserver existsObserver;
-	private CassandraStore store;
-
-	@Test
-	public void testKeyspace() throws Exception {
-		assertTrue(store.has(KEYSPACE));
-		store.delete(KEYSPACE);
-		Thread.sleep(100);
-		assertFalse(store.has(KEYSPACE));
-	}
-
-	@Test
-	public void testTable() throws Exception {
-		assertFalse(store.has(KEYSPACE, TABLE));
-		store.create(KEYSPACE, TABLE);
-		Thread.sleep(100);
-		assertTrue(store.has(KEYSPACE, TABLE));
-		store.delete(KEYSPACE, TABLE);
-		Thread.sleep(100);
-		assertFalse(store.has(KEYSPACE, TABLE));
-	}
 
 	@Test
 	public void testExistence() throws Exception {
 
-		store.create(KEYSPACE, TABLE);
-
-		final Batch batch = store.batch(KEYSPACE);
-		batch.row(TABLE, "test-1").set("column_key", "column_value");
+		final Batch batch = store.batch(keyspace);
+		batch.row(table, "test-1").set("column_key", "column_value");
 		batch.commit();
 
 		Thread.sleep(100);
 
-		existsObserver.reset();
-
-		store.exists(KEYSPACE, TABLE, "test-1").subscribe(existsObserver);
+		store.exists(keyspace, table, "test-1").subscribe(existsObserver);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
 			@Override
@@ -83,7 +57,7 @@ public class TestCassandraStore {
 
 		existsObserver.reset();
 
-		store.exists(KEYSPACE, TABLE, "test-2").subscribe(existsObserver);
+		store.exists(keyspace, table, "test-2").subscribe(existsObserver);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
 			@Override
@@ -99,11 +73,7 @@ public class TestCassandraStore {
 	@Test
 	public void testQueryMissing() throws Exception {
 
-		store.create(KEYSPACE, TABLE);
-		Thread.sleep(100);
-		observer.reset();
-
-		store.fetch(KEYSPACE, TABLE, "test-1").build().subscribe(observer);
+		store.fetch(keyspace, table, "test-1").build().subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
 			@Override
@@ -112,23 +82,21 @@ public class TestCassandraStore {
 			}
 		});
 
-		assertEquals(0, observer.rows.size());
+		assertEquals(1, observer.rows.size());
+		assertEquals(0, observer.rows.get(0).columns().size());
 
 	}
 
 	@Test
 	public void testInsert() throws Exception {
 
-		store.create(KEYSPACE, TABLE);
-		Thread.sleep(100);
-
-		Batch batch = store.batch(KEYSPACE);
-		batch.row(TABLE, "test-1").set("column_key", "column_value");
+		Batch batch = store.batch(keyspace);
+		batch.row(table, "test-1").set("column_key", "column_value");
 		batch.commit();
 
 		Thread.sleep(100);
 
-		store.fetch(KEYSPACE, TABLE, "test-1").build().subscribe(observer);
+		store.fetch(keyspace, table, "test-1").build().subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
 			@Override
@@ -142,15 +110,15 @@ public class TestCassandraStore {
 		assertEquals(observer.rows.get(0).get("column_key").getString(),
 				"column_value");
 
-		batch = store.batch(KEYSPACE);
-		batch.row(TABLE, "test-2").set("column_key", "column_value2");
-		batch.row(TABLE, "test-3").set("column_key", "column_value2");
+		batch = store.batch(keyspace);
+		batch.row(table, "test-2").set("column_key", "column_value2");
+		batch.row(table, "test-3").set("column_key", "column_value2");
 		batch.commit();
 
 		Thread.sleep(100);
 
-		store.fetch(KEYSPACE, TABLE, "test-2").build().subscribe(observer);
-		store.fetch(KEYSPACE, TABLE, "test-3").build().subscribe(observer);
+		store.fetch(keyspace, table, "test-2").build().subscribe(observer);
+		store.fetch(keyspace, table, "test-3").build().subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
 			@Override
@@ -169,23 +137,27 @@ public class TestCassandraStore {
 	@Test
 	public void testUUID() throws Exception {
 
-		final Table<UUID, String> table =
-				Table.make("cs_test_table", UUID.class, String.class);
-		store.create(KEYSPACE, table);
+		final Table<UUID, String> uuidTable =
+				Table.make(randomName(), UUID.class, String.class);
+		store.create(keyspace, uuidTable);
 
-		Thread.sleep(100);
+		CallableTest.waitFor(new Callable<Boolean>() {
+			@Override
+			public Boolean call() throws Exception {
+				return store.has(keyspace, uuidTable);
+			}
+		}, 5000);
 
 		final UUID uuid = TimeUUIDUtils.getUniqueTimeUUIDinMillis();
 
-		System.out.println(UUIDSerializer.get().toByteBuffer(uuid));
-
-		final Batch batch = store.batch(KEYSPACE);
-		batch.row(table, "test-1").set(uuid, "column_value");
+		final Batch batch = store.batch(keyspace);
+		batch.row(uuidTable, "test-1").set(uuid, "column_value");
 		batch.commit();
 
 		Thread.sleep(100);
 
-		store.fetch(KEYSPACE, table, "test-1").build().subscribe(uuidObserver);
+		store.fetch(keyspace, uuidTable, "test-1").build()
+				.subscribe(uuidObserver);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
 			@Override
@@ -204,11 +176,8 @@ public class TestCassandraStore {
 	@Test
 	public void testColumnLimit() throws Exception {
 
-		store.create(KEYSPACE, TABLE);
-		Thread.sleep(100);
-
-		final Batch batch = store.batch(KEYSPACE);
-		final RowMutator<String> rm = batch.row(TABLE, "test-1");
+		final Batch batch = store.batch(keyspace);
+		final RowMutator<String> rm = batch.row(table, "test-1");
 		for (int i = 1; i < 100; i++) {
 			rm.set("field" + i, "value" + i);
 		}
@@ -216,7 +185,7 @@ public class TestCassandraStore {
 
 		Thread.sleep(100);
 
-		store.fetch(KEYSPACE, TABLE, "test-1").first(1).build()
+		store.fetch(keyspace, table, "test-1").first(1).build()
 				.subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
@@ -232,7 +201,7 @@ public class TestCassandraStore {
 		assertEquals("value1", row.get("field1").getString());
 
 		observer.reset();
-		store.fetch(KEYSPACE, TABLE, "test-1").last(1).build()
+		store.fetch(keyspace, table, "test-1").last(1).build()
 				.subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
@@ -252,11 +221,8 @@ public class TestCassandraStore {
 	@Test
 	public void testColumnSlice() throws Exception {
 
-		store.create(KEYSPACE, TABLE);
-		Thread.sleep(100);
-
-		final Batch batch = store.batch(KEYSPACE);
-		final RowMutator<String> rm = batch.row(TABLE, "test-1");
+		final Batch batch = store.batch(keyspace);
+		final RowMutator<String> rm = batch.row(table, "test-1");
 		for (int i = 1; i < 100; i++) {
 			rm.set("field" + i, "value" + i);
 		}
@@ -264,7 +230,7 @@ public class TestCassandraStore {
 
 		Thread.sleep(100);
 
-		store.fetch(KEYSPACE, TABLE, "test-1").start("field10").end("field15")
+		store.fetch(keyspace, table, "test-1").start("field10").end("field15")
 				.build().subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
@@ -286,7 +252,7 @@ public class TestCassandraStore {
 		assertEquals("field15", row.getByIndex(5).getName());
 
 		observer.reset();
-		store.fetch(KEYSPACE, TABLE, "test-1")
+		store.fetch(keyspace, table, "test-1")
 				.columns("field10", "field15", "field20", "field1000").build()
 				.subscribe(observer);
 
@@ -311,19 +277,16 @@ public class TestCassandraStore {
 	@Test
 	public void testQueryAll() throws Exception {
 
-		store.create(KEYSPACE, TABLE);
-		Thread.sleep(100);
-
-		final Batch batch = store.batch(KEYSPACE);
-		batch.row(TABLE, "test-1").set("column_key", "column_value1");
-		batch.row(TABLE, "test-2").set("column_key", "column_value2");
-		batch.row(TABLE, "test-3").set("column_key", "column_value3");
-		batch.row(TABLE, "test-4").set("column_key", "column_value4");
+		final Batch batch = store.batch(keyspace);
+		batch.row(table, "test-1").set("column_key", "column_value1");
+		batch.row(table, "test-2").set("column_key", "column_value2");
+		batch.row(table, "test-3").set("column_key", "column_value3");
+		batch.row(table, "test-4").set("column_key", "column_value4");
 		batch.commit();
 
 		Thread.sleep(100);
 
-		store.fetch(KEYSPACE, TABLE).build().subscribe(observer);
+		store.fetch(keyspace, table).build().subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
 			@Override
@@ -340,7 +303,9 @@ public class TestCassandraStore {
 	@Test
 	public void testIndexQuery() throws Exception {
 
-		store.create(KEYSPACE, TABLE, new ColumnDef() {
+		final Table<String, String> indexTable = Table.make(randomName());
+
+		store.create(keyspace, indexTable, new ColumnDef() {
 
 			@Override
 			public String key() {
@@ -378,16 +343,16 @@ public class TestCassandraStore {
 
 		Thread.sleep(100);
 
-		final Batch batch = store.batch(KEYSPACE);
+		final Batch batch = store.batch(keyspace);
 		for (int i = 1; i < 1000; i++) {
-			batch.row(TABLE, "test-" + i).set("field", "value-" + (i % 100))
-					.set("num", i);
+			batch.row(indexTable, "test-" + i)
+					.set("field", "value-" + (i % 100)).set("num", i);
 		}
 		batch.commit();
 
 		Thread.sleep(1000);
 
-		store.query(KEYSPACE, TABLE).where("field", "value-50").build()
+		store.query(keyspace, indexTable).where("field", "value-50").build()
 				.subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
@@ -402,7 +367,7 @@ public class TestCassandraStore {
 
 		observer.reset();
 
-		store.query(KEYSPACE, TABLE).where("field", "value-50")
+		store.query(keyspace, indexTable).where("field", "value-50")
 				.where("num", 50).build().subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
@@ -417,7 +382,7 @@ public class TestCassandraStore {
 
 		observer.reset();
 
-		store.query(KEYSPACE, TABLE).where("field", "value-50")
+		store.query(keyspace, indexTable).where("field", "value-50")
 				.where("num", 500, Operator.LT).build().subscribe(observer);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
@@ -433,28 +398,74 @@ public class TestCassandraStore {
 	}
 
 	@Before
-	public void setUp() throws Exception {
+	public void prepare() throws Exception {
+		table = Table.make(randomName());
 		observer = new TestObserver<String>();
 		uuidObserver = new TestObserver<UUID>();
 		existsObserver = new ExistsObserver();
-		store = new CassandraStore();
-		store.setCredentials("cassandra", "Erpe5PXRQmG1gVOpnvmiEwNjqCz3Qw3o");
-		store.connect();
+		store.create(keyspace, table);
 		try {
-			store.delete(KEYSPACE);
+			CallableTest.waitFor(new Callable<Boolean>() {
+				@Override
+				public Boolean call() throws Exception {
+					return store.has(keyspace, table);
+				}
+			}, 5000);
 		} catch (final Exception e) {
+			store.delete(keyspace, table);
+			throw e;
 		}
-		store.create(KEYSPACE);
 	}
 
-	@After
-	public void tearDown() throws Exception {
+	@BeforeClass
+	public static void setUp() throws Exception {
+		store = new CassandraStore();
+		store.setSeeds("eqx01.chicago.b.cassandra.eqx.barchart.com",
+				"eqx02.chicago.b.cassandra.eqx.barchart.com");
+		store.setCredentials("cassandra", "Erpe5PXRQmG1gVOpnvmiEwNjqCz3Qw3o");
+		store.connect();
+		keyspace = randomName();
+		store.create(keyspace);
 		try {
-			store.delete(KEYSPACE);
+			CallableTest.waitFor(new Callable<Boolean>() {
+				@Override
+				public Boolean call() throws Exception {
+					return store.has(keyspace);
+				}
+			}, 5000);
 		} catch (final Exception e) {
+			store.delete(keyspace);
+			throw e;
 		}
-		store.disconnect();
-		store = null;
+	}
+
+	// tearDown() will kill all tables during keyspace removal
+	// @After
+	public void cleanUp() throws Exception {
+		try {
+			store.delete(keyspace, table);
+		} catch (final Exception e) {
+			System.out.println(e.getMessage());
+		}
+	}
+
+	@AfterClass
+	public static void tearDown() throws Exception {
+		if (store != null) {
+			if (keyspace != null) {
+				try {
+					store.delete(keyspace);
+				} catch (final Exception e) {
+					System.out.println(e.getMessage());
+				}
+			}
+			store.disconnect();
+			store = null;
+		}
+	}
+
+	private static String randomName() {
+		return "test_" + UUID.randomUUID().toString().replace("-", "");
 	}
 
 	private class TestObserver<T> implements Observer<StoreRow<T>> {
