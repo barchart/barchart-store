@@ -1,6 +1,6 @@
 package com.barchart.store.cassandra;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -137,8 +137,8 @@ public class TestCassandraStore {
 	@Test
 	public void testUUID() throws Exception {
 
-		final Table<UUID, String> uuidTable =
-				Table.make(randomName(), UUID.class, String.class);
+		final Table<UUID, String> uuidTable = Table.make(randomName(),
+				UUID.class, String.class);
 		store.create(keyspace, uuidTable);
 
 		CallableTest.waitFor(new Callable<Boolean>() {
@@ -465,7 +465,8 @@ public class TestCassandraStore {
 	}
 
 	private static String randomName() {
-		return "test_" + UUID.randomUUID().toString().replace("-", "");
+		return TestCassandraStore.class.getName() + "_"
+				+ UUID.randomUUID().toString().replace("-", "");
 	}
 
 	private class TestObserver<T> implements Observer<StoreRow<T>> {
