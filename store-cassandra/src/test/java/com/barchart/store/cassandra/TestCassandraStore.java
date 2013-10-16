@@ -464,6 +464,7 @@ public class TestCassandraStore {
 		}
 	}
 
+	/** NOTE: must be under 48 chars in size. */
 	private static String randomName() {
 		return TestCassandraStore.class.getSimpleName() + "_"
 				+ System.nanoTime();
