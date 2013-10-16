@@ -34,7 +34,7 @@ public class HeapRow<K> implements StoreRow<K> {
 
 	@Override
 	public Collection<K> columns() {
-		return Collections.unmodifiableCollection(names);
+		return Collections.unmodifiableCollection(columns.keySet());
 	}
 
 	@Override

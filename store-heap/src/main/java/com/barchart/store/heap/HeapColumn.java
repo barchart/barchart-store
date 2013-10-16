@@ -56,7 +56,11 @@ class HeapColumn<K> implements StoreColumn<K> {
 	}
 
 	protected void set(final String value) {
-		data = ByteBuffer.wrap(value.getBytes(UTF8));
+		if (value == null) {
+			data = null;
+		} else {
+			data = ByteBuffer.wrap(value.getBytes(UTF8));
+		}
 		timestamp = System.currentTimeMillis();
 	}
 
@@ -89,18 +93,26 @@ class HeapColumn<K> implements StoreColumn<K> {
 	}
 
 	protected void set(final Date value) {
-		data = ByteBuffer.allocate(8);
-		data.putLong(value.getTime());
-		data.flip();
+		if (value == null) {
+			data = null;
+		} else {
+			data = ByteBuffer.allocate(8);
+			data.putLong(value.getTime());
+			data.flip();
+		}
 		timestamp = System.currentTimeMillis();
 	}
 
 	protected void set(final ByteBuffer value) {
-		data = ByteBuffer.allocate(value.capacity());
-		value.rewind();
-		data.put(value);
-		value.rewind();
-		data.flip();
+		if (value == null) {
+			data = null;
+		} else {
+			data = ByteBuffer.allocate(value.capacity());
+			value.rewind();
+			data.put(value);
+			value.rewind();
+			data.flip();
+		}
 		timestamp = System.currentTimeMillis();
 	}
 

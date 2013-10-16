@@ -123,8 +123,14 @@ public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
 				}
 
 			} else if (columns != null) {
+
 				columns.retainAll(row.columns());
 				availColumns.addAll(columns);
+
+			} else {
+
+				availColumns.addAll(row.columns());
+
 			}
 
 		}

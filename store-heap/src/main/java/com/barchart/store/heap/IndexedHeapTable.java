@@ -171,6 +171,10 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 			final Map<Object, Collection<HeapRow<String>>> map, final T value,
 			final HeapRow<String> row) {
 
+		if (value == null) {
+			return;
+		}
+
 		Collection<HeapRow<String>> matches = map.get(value);
 
 		if (matches == null) {
@@ -192,6 +196,10 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 	private <T> void removeIndex(
 			final Map<Object, Collection<HeapRow<String>>> map, final T value,
 			final HeapRow<String> row) {
+
+		if (value == null) {
+			return;
+		}
 
 		final Collection<HeapRow<String>> matches = map.get(value);
 
