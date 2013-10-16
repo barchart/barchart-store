@@ -465,7 +465,7 @@ public class TestCassandraStore {
 	}
 
 	private static String randomName() {
-		return TestCassandraStore.class.getName() + "_"
+		return TestCassandraStore.class.getSimpleName() + "_"
 				+ UUID.randomUUID().toString().replace("-", "");
 	}
 
