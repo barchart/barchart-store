@@ -466,7 +466,7 @@ public class TestCassandraStore {
 
 	private static String randomName() {
 		return TestCassandraStore.class.getSimpleName() + "_"
-				+ UUID.randomUUID().toString().replace("-", "");
+				+ System.nanoTime();
 	}
 
 	private class TestObserver<T> implements Observer<StoreRow<T>> {
