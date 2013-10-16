@@ -393,7 +393,6 @@ public class TestHeapStore {
 		@Override
 		public void onNext(final StoreRow<String> row) {
 			rows.add(row);
-			System.out.println(row);
 		}
 
 		public void reset() {
