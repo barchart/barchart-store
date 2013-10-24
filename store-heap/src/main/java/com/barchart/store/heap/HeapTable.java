@@ -36,6 +36,11 @@ public class HeapTable<K, V> {
 				final HeapRow<K> row = rows.get(key);
 				if (row != null) {
 					matches.add(row);
+				} else {
+					// Per spec (and Cassandra behavior), we should always
+					// return a row for an explicitly requested key, even if it
+					// is empty
+					matches.add(new HeapRow<K>(key));
 				}
 			}
 

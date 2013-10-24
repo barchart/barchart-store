@@ -66,7 +66,8 @@ public class TestHeapStore {
 			}
 		});
 
-		assertEquals(0, observer.rows.size());
+		assertEquals(1, observer.rows.size());
+		assertEquals(0, observer.rows.get(0).columns().size());
 
 	}
 
