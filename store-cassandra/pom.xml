@@ -30,7 +30,7 @@ Cassandra data store implementation and OSGI components
 	</scm>
 
 	<properties>
-		<projectJavaVersion>1.7</projectJavaVersion>
+		<projectJavaVersion>1.6</projectJavaVersion>
 	</properties>
 
 	<dependencies>

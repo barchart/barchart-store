@@ -30,7 +30,7 @@ API for key/value data store access
 	</scm>
 
 	<properties>
-		<projectJavaVersion>1.7</projectJavaVersion>
+		<projectJavaVersion>1.6</projectJavaVersion>
 	</properties>
 
 	<dependencies>
