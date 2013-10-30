@@ -122,6 +122,38 @@ public class TestHeapStore {
 	}
 
 	@Test
+	public void testIndividualColumns() throws Exception {
+
+		store.create(KEYSPACE, TABLE);
+		Thread.sleep(100);
+
+		Batch batch = store.batch(KEYSPACE);
+		batch.row(TABLE, "test-1").set("column1", "value1");
+		batch.commit();
+
+		batch = store.batch(KEYSPACE);
+		batch.row(TABLE, "test-1").set("column2", "value2");
+		batch.commit();
+
+		Thread.sleep(100);
+
+		store.fetch(KEYSPACE, TABLE, "test-1").build().subscribe(observer);
+
+		CallableTest.waitFor(new Callable<Boolean>() {
+			@Override
+			public Boolean call() throws Exception {
+				return observer.completed;
+			}
+		});
+
+		assertEquals(null, observer.error);
+		assertEquals(1, observer.rows.size());
+		assertEquals(observer.rows.get(0).get("column1").getString(), "value1");
+		assertEquals(observer.rows.get(0).get("column2").getString(), "value2");
+
+	}
+
+	@Test
 	public void testColumnLimit() throws Exception {
 
 		store.create(KEYSPACE, TABLE);
