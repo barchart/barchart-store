@@ -65,7 +65,7 @@ class HeapColumn<K> implements StoreColumn<K> {
 	}
 
 	protected void set(final double value) {
-		data = ByteBuffer.allocate(4);
+		data = ByteBuffer.allocate(8);
 		data.putDouble(value);
 		data.flip();
 		timestamp = System.currentTimeMillis();
