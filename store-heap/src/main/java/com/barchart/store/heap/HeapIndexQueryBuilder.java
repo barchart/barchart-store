@@ -139,7 +139,9 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 						final Collection<HeapRow<T>> matches =
 								indexes.get(fc.column).get(fc.value);
 						if (rows.size() == 0 && first) {
-							rows.addAll(matches);
+							if (matches != null) {
+								rows.addAll(matches);
+							}
 						} else {
 							if (matches != null) {
 								rows.retainAll(matches);
