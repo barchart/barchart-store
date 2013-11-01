@@ -88,10 +88,19 @@ public class CassandraStore implements StoreService {
 	private String user = "cassandra";
 	private String password = "cassandra";
 
-	private final ExecutorService executor = Executors.newCachedThreadPool();
+	private final ExecutorService executor;
 
 	static private AstyanaxContext<Cluster> clusterContext = null;
 
+	public CassandraStore() {
+		this(Executors.newCachedThreadPool());
+	}
+	
+	public CassandraStore(ExecutorService executor) {
+		this.executor = executor;
+	}
+	
+	
 	public void setSeeds(final String... seeds_) {
 		seeds = seeds_;
 	}
