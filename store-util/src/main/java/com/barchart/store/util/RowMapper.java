@@ -1,5 +1,8 @@
 package com.barchart.store.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import rx.util.functions.Func1;
 
 import com.barchart.store.api.RowMutator;
@@ -19,14 +22,22 @@ public abstract class RowMapper<K, T> implements Func1<StoreRow<K>, T> {
 				.withCreatorVisibility(JsonAutoDetect.Visibility.NONE));
 	}
 
+	private final Logger log = LoggerFactory.getLogger(getClass());
+
 	@Override
 	public T call(final StoreRow<K> row) {
-		return decode(row);
+		try {
+			return decode(row);
+		} catch (final Exception e) {
+			log.debug("Could not decode row", e);
+			return null;
+		}
 	}
 
-	public abstract void encode(final T obj, final RowMutator<K> mutator);
+	public abstract void encode(final T obj, final RowMutator<K> mutator)
+			throws Exception;
 
-	public abstract T decode(final StoreRow<K> row);
+	public abstract T decode(final StoreRow<K> row) throws Exception;
 
 	protected ObjectMapper mapper() {
 		return RowMapper.mapper;

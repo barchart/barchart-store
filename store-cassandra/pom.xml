@@ -91,6 +91,10 @@ Cassandra data store implementation and OSGI components
 					<plugin>
 						<groupId>org.apache.aries.versioning</groupId>
 						<artifactId>org.apache.aries.versioning.plugin</artifactId>
+						<version>0.1.0-build001</version>
+						<configuration>
+							<bundleOverridesPackage>true</bundleOverridesPackage>
+						</configuration>
 					</plugin>
 				</plugins>
 			</build>
@@ -98,42 +102,4 @@ Cassandra data store implementation and OSGI components
 
 	</profiles>
 
-	<build>
-		<pluginManagement>
-			<plugins>
-				<!--This plugin's configuration is used to store Eclipse m2e settings 
-					only. It has no influence on the Maven build itself. -->
-				<plugin>
-					<groupId>org.eclipse.m2e</groupId>
-					<artifactId>lifecycle-mapping</artifactId>
-					<version>1.0.0</version>
-					<configuration>
-						<lifecycleMappingMetadata>
-							<pluginExecutions>
-								<pluginExecution>
-									<pluginExecutionFilter>
-										<groupId>
-											com.carrotgarden.maven
-										</groupId>
-										<artifactId>
-											carrot-maven-scr-plugin
-										</artifactId>
-										<versionRange>
-											[3.0.3,)
-										</versionRange>
-										<goals>
-											<goal>generate</goal>
-										</goals>
-									</pluginExecutionFilter>
-									<action>
-										<ignore />
-									</action>
-								</pluginExecution>
-							</pluginExecutions>
-						</lifecycleMappingMetadata>
-					</configuration>
-				</plugin>
-			</plugins>
-		</pluginManagement>
-	</build>
 </project>
