@@ -636,36 +636,57 @@ public class CassandraStore implements StoreService {
 
 		@Override
 		public String getString() throws Exception {
+			if (!column.hasValue()) {
+				return null;
+			}
 			return column.getStringValue();
 		}
 
 		@Override
 		public Double getDouble() throws Exception {
+			if (!column.hasValue()) {
+				return null;
+			}
 			return column.getDoubleValue();
 		}
 
 		@Override
 		public Integer getInt() throws Exception {
+			if (!column.hasValue()) {
+				return null;
+			}
 			return column.getIntegerValue();
 		}
 
 		@Override
 		public Long getLong() throws Exception {
+			if (!column.hasValue()) {
+				return null;
+			}
 			return column.getLongValue();
 		}
 
 		@Override
 		public Boolean getBoolean() throws Exception {
+			if (!column.hasValue()) {
+				return null;
+			}
 			return column.getBooleanValue();
 		}
 
 		@Override
 		public Date getDate() throws Exception {
+			if (!column.hasValue()) {
+				return null;
+			}
 			return column.getDateValue();
 		}
 
 		@Override
 		public ByteBuffer getBlob() throws Exception {
+			if (!column.hasValue()) {
+				return null;
+			}
 			return column.getByteBufferValue();
 		}
 
