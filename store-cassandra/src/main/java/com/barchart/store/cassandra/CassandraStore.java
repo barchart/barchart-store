@@ -95,12 +95,11 @@ public class CassandraStore implements StoreService {
 	public CassandraStore() {
 		this(Executors.newCachedThreadPool());
 	}
-	
-	public CassandraStore(ExecutorService executor) {
+
+	public CassandraStore(final ExecutorService executor) {
 		this.executor = executor;
 	}
-	
-	
+
 	public void setSeeds(final String... seeds_) {
 		seeds = seeds_;
 	}
@@ -374,8 +373,8 @@ public class CassandraStore implements StoreService {
 				props.put("validation_class", validatorFor(column.type()));
 
 				if (column.isIndexed()) {
-					props.put("index_name", column.key() + "_" + table.name
-							+ "_idx");
+					props.put("index_name",
+							safeIndexName(table.name, column.key()));
 					props.put("index_type", "KEYS");
 				}
 
@@ -389,6 +388,11 @@ public class CassandraStore implements StoreService {
 
 		return builder.build();
 
+	}
+
+	private static String safeIndexName(final String table, final String field) {
+		return table.replaceAll("[-\\.]", "_") + "_"
+				+ field.replaceAll("[-\\.]", "_") + "_idx";
 	}
 
 	private static <T> StoreRow<T> wrapRow(final Row<String, T> row) {
