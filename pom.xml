@@ -29,6 +29,7 @@ Layout Project.
 		<module>store-cassandra</module>
 		<module>store-heap</module>
 		<module>store-util</module>
+		<module>store-model</module>
 
 	</modules>
 

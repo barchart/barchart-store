@@ -10,15 +10,15 @@
 	</parent>
 
 	<groupId>com.barchart.store</groupId>
-	<artifactId>store-util</artifactId>
-	<version>1.2.0-SNAPSHOT</version>
+	<artifactId>store-model</artifactId>
+	<version>1.0.0-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<description>
 <![CDATA[
 ### ${project.artifactId}
 
-Data store utils
+Data store model helpers
 ]]>
 	</description>
 
@@ -36,33 +36,9 @@ Data store utils
 	<dependencies>
 
 		<dependency>
-			<groupId>com.barchart.store</groupId>
-			<artifactId>store-api</artifactId>
-			<version>[3.0-SNAPSHOT,4.0-SNAPSHOT)</version>
-		</dependency>
-
-		<dependency>
-			<groupId>com.barchart.util</groupId>
-			<artifactId>barchart-util-observer</artifactId>
-			<version>[1.0-SNAPSHOT,2.0-SNAPSHOT)</version>
-		</dependency>
-
-		<dependency>
-		    <groupId>com.eaio.uuid</groupId>
-		    <artifactId>uuid</artifactId>
-		    <version>3.2</version>
-		</dependency>
-
-		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
 			<version>[2.1,2.2-rc1)</version>
-		</dependency>
-		
-		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<scope>provided</scope>
 		</dependency>
 		
 	</dependencies>

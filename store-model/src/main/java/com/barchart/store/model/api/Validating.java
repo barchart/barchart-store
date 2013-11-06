@@ -1,4 +1,4 @@
-package com.barchart.store.util;
+package com.barchart.store.model.api;
 
 public interface Validating {
 
