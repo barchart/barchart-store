@@ -14,7 +14,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
-import rx.util.functions.Func1;
 
 import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.StoreColumn;
@@ -155,45 +154,44 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 
 		}
 
-		return Observable
-				.create(new Func1<Observer<StoreRow<T>>, Subscription>() {
+		return Observable.create(new Observable.OnSubscribeFunc<StoreRow<T>>() {
 
-					@Override
-					public Subscription call(final Observer<StoreRow<T>> o) {
+			@Override
+			public Subscription onSubscribe(
+					final Observer<? super StoreRow<T>> o) {
 
-						final AtomicBoolean running = new AtomicBoolean(true);
-						int ct = 0;
+				final AtomicBoolean running = new AtomicBoolean(true);
+				int ct = 0;
 
-						try {
+				try {
 
-							for (final HeapRow<T> row : rows) {
-								if (!running.get()
-										|| (limit > 0 && ct >= limit)) {
-									o.onCompleted();
-									break;
-								}
-								o.onNext(new RowFilter(row));
-								ct++;
-							}
-
+					for (final HeapRow<T> row : rows) {
+						if (!running.get() || (limit > 0 && ct >= limit)) {
 							o.onCompleted();
-
-						} catch (final Exception e) {
-							o.onError(e);
+							break;
 						}
-
-						return new Subscription() {
-
-							@Override
-							public void unsubscribe() {
-								running.set(false);
-							}
-
-						};
-
+						o.onNext(new RowFilter(row));
+						ct++;
 					}
 
-				});
+					o.onCompleted();
+
+				} catch (final Exception e) {
+					o.onError(e);
+				}
+
+				return new Subscription() {
+
+					@Override
+					public void unsubscribe() {
+						running.set(false);
+					}
+
+				};
+
+			}
+
+		});
 
 	}
 

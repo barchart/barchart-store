@@ -31,16 +31,15 @@ public interface ObservableQueryBuilder<T> {
 	ObservableQueryBuilder<T> end(T column);
 
 	/**
-	 * Only return columns that start with the given prefix. Only applies to
-	 * String column keys.
+	 * Only return columns that start with the given prefix. Only provides
+	 * predictable results for String column keys.
 	 */
 	ObservableQueryBuilder<T> prefix(String prefix);
 
 	/**
 	 * Only return the named columns for each row.
 	 */
-	ObservableQueryBuilder<T> columns(
-			@SuppressWarnings("unchecked") T... columns);
+	ObservableQueryBuilder<T> columns(T... columns);
 
 	/**
 	 * Fetch all matching rows

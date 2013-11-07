@@ -51,7 +51,6 @@ public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
 		return this;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public ObservableQueryBuilder<T> columns(final T... columns_) {
 		columns = new ArrayList<T>(Arrays.asList(columns_));

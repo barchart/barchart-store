@@ -6,7 +6,6 @@ import java.util.Map;
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
-import rx.util.functions.Func1;
 
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.ColumnDef;
@@ -83,10 +82,11 @@ public class HeapStore implements StoreService {
 	public <K, V> Observable<Boolean> exists(final String database,
 			final Table<K, V> table, final String keys) throws Exception {
 
-		return Observable.create(new Func1<Observer<Boolean>, Subscription>() {
+		return Observable.create(new Observable.OnSubscribeFunc<Boolean>() {
 
 			@Override
-			public Subscription call(final Observer<Boolean> observer) {
+			public Subscription onSubscribe(
+					final Observer<? super Boolean> observer) {
 
 				try {
 
