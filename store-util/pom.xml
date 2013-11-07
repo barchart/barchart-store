@@ -11,7 +11,7 @@
 
 	<groupId>com.barchart.store</groupId>
 	<artifactId>store-util</artifactId>
-	<version>1.2.1</version>
+	<version>1.2.2-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<description>
@@ -26,7 +26,7 @@ Data store utils
 		<url>https://github.com/barchart/barchart-store</url>
 		<connection>scm:git:git://github.com/barchart/barchart-store.git</connection>
 		<developerConnection>scm:git:ssh://git@github.com/barchart/barchart-store.git</developerConnection>
-		<tag>store-util-1.2.1</tag>
+		<tag>master</tag>
 	</scm>
 
 	<properties>
