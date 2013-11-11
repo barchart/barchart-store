@@ -308,6 +308,30 @@ public abstract class StoreObjectMapper {
 
 	}
 
+	protected static String[] toStrings(final Object[] ary) {
+
+		final String[] strings = new String[ary.length];
+
+		for (int i = 0; i < ary.length; i++) {
+			strings[i] = ary[i].toString();
+		}
+
+		return strings;
+
+	}
+
+	protected static String[] toStrings(final List<?> list) {
+
+		final String[] strings = new String[list.size()];
+
+		for (int i = 0; i < list.size(); i++) {
+			strings[i] = list.get(i).toString();
+		}
+
+		return strings;
+
+	}
+
 	private static class ListExploder<T> implements
 			Func1<List<T>, Observable<T>> {
 
