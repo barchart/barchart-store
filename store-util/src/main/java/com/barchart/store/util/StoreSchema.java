@@ -63,7 +63,13 @@ public abstract class StoreSchema {
 		}
 
 		public SchemaTable<K, V> index(final String key_, final Class<?> type_) {
-			columns.add(new SchemaColumn(key_, type_));
+			columns.add(new SchemaColumn(key_, type_, true));
+			return this;
+		}
+
+		public SchemaTable<K, V> column(final String key_,
+				final Class<?> type_, final boolean indexed_) {
+			columns.add(new SchemaColumn(key_, type_, indexed_));
 			return this;
 		}
 
@@ -72,11 +78,14 @@ public abstract class StoreSchema {
 	private static class SchemaColumn implements ColumnDef {
 
 		private final String key;
+		private final boolean indexed;
 		private final Class<?> type;
 
-		public SchemaColumn(final String key_, final Class<?> type_) {
+		public SchemaColumn(final String key_, final Class<?> type_,
+				final boolean indexed_) {
 			key = key_;
 			type = type_;
+			indexed = indexed_;
 		}
 
 		@Override
@@ -86,7 +95,7 @@ public abstract class StoreSchema {
 
 		@Override
 		public boolean isIndexed() {
-			return true;
+			return indexed;
 		}
 
 		@Override

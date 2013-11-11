@@ -78,9 +78,13 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 			// This shit is really inefficient, avoid LT/GT filters on large
 			// data sets for StoreHeap
 			boolean first = true;
+
 			for (final FieldCompare fc : filters) {
+
 				final Iterator<HeapRow<T>> iter;
+
 				switch (fc.operator) {
+
 					case GT:
 						iter = rows.iterator();
 						while (iter.hasNext()) {
@@ -94,6 +98,7 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 							}
 						}
 						break;
+
 					case GTE:
 						iter = rows.iterator();
 						while (iter.hasNext()) {
@@ -107,6 +112,7 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 							}
 						}
 						break;
+
 					case LT:
 						iter = rows.iterator();
 						while (iter.hasNext()) {
@@ -120,6 +126,7 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 							}
 						}
 						break;
+
 					case LTE:
 						iter = rows.iterator();
 						while (iter.hasNext()) {
@@ -133,10 +140,15 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 							}
 						}
 						break;
+
 					case EQUAL:
 					default:
-						final Collection<HeapRow<T>> matches =
-								indexes.get(fc.column).get(fc.value);
+
+						Collection<HeapRow<T>> matches =
+								indexes.containsKey(fc.column) ? matches =
+										indexes.get(fc.column).get(fc.value)
+										: null;
+
 						if (rows.size() == 0 && first) {
 							if (matches != null) {
 								rows.addAll(matches);
@@ -148,8 +160,11 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 								rows.clear();
 							}
 						}
+
 				}
+
 				first = false;
+
 			}
 
 		}

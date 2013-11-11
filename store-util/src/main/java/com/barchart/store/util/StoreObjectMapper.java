@@ -3,6 +3,11 @@ package com.barchart.store.util;
 import java.util.Arrays;
 import java.util.List;
 
+import rx.Observable;
+import rx.Observer;
+import rx.Subscription;
+import rx.util.functions.Func1;
+
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableIndexQueryBuilder.Operator;
@@ -10,7 +15,6 @@ import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreService;
 import com.barchart.store.api.StoreService.Table;
-import com.barchart.util.observer.Observer;
 
 public abstract class StoreObjectMapper {
 
@@ -27,29 +31,51 @@ public abstract class StoreObjectMapper {
 		mappers = new MapperFactory();
 	}
 
+	/**
+	 * Update the data store schema definition. This should only be called
+	 * manually.
+	 */
 	public void updateSchema() throws Exception {
 		schema.update(store, database);
 	}
 
-	protected <K, V, T, M extends RowMapper<K, T>> void loadRows(
+	/*
+	 * Direct store access methods for subclasses with more complex query
+	 * requirements.
+	 */
+
+	protected StoreService store() {
+		return store;
+	}
+
+	protected String database() {
+		return database;
+	}
+
+	protected <K, T, M extends RowMapper<K, T>> M mapper(final Class<M> cls) {
+		return mappers.instance(cls);
+	}
+
+	/*
+	 * Helper methods for subclasses.
+	 */
+
+	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> loadRows(
 			final Table<K, V> table, final Class<M> mapper,
-			final Observer<T> observer, final String... keys) {
+			final String... keys) {
 
 		try {
-
-			store.fetch(database, table, keys).build()
-					.filter(new EmptyRowFilter<K>()).map(mapper(mapper))
-					.subscribe(new WrapObserver<T>(observer));
-
-		} catch (final Throwable e) {
-			observer.onError(e);
+			return store.fetch(database, table, keys).build()
+					.filter(new EmptyRowFilter<K>()).map(mapper(mapper));
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <K, V, T, M extends RowMapper<K, List<T>>> void loadColumns(
-			final Table<K, V> table, final Class<M> mapper,
-			final Observer<T> observer, final String key, final K... columns) {
+	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> loadColumns(
+			final Table<K, V> table, final Class<M> mapper, final String key,
+			final K... columns) {
 
 		try {
 
@@ -60,35 +86,34 @@ public abstract class StoreObjectMapper {
 				query.columns(columns);
 			}
 
-			query.build().filter(new EmptyRowFilter<K>()).map(mapper(mapper))
-					.subscribe(new ListObserver<T>(observer));
+			return query.build().filter(new EmptyRowFilter<K>())
+					.map(mapper(mapper)).mapMany(new ListExploder<T>());
 
-		} catch (final Throwable e) {
-			observer.onError(e);
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <V, T, M extends RowMapper<String, List<T>>> void loadColumnsByPrefix(
+	protected <V, T, M extends RowMapper<String, List<T>>> Observable<T> loadColumnsByPrefix(
 			final Table<String, V> table, final Class<M> mapper,
-			final Observer<T> observer, final String key, final String prefix) {
+			final String key, final String prefix) {
 
 		try {
 
-			store.fetch(database, table, key).prefix(prefix).build()
+			return store.fetch(database, table, key).prefix(prefix).build()
 					.filter(new EmptyRowFilter<String>()).map(mapper(mapper))
-					.subscribe(new ListObserver<T>(observer));
+					.mapMany(new ListExploder<T>());
 
-		} catch (final Throwable e) {
-			observer.onError(e);
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <K, V, T, M extends RowMapper<K, List<T>>> void loadColumns(
-			final Table<K, V> table, final Class<M> mapper,
-			final Observer<T> observer, final String key, final int count,
-			final boolean reverse) {
+	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> loadColumns(
+			final Table<K, V> table, final Class<M> mapper, final String key,
+			final int count, final boolean reverse) {
 
 		try {
 
@@ -101,35 +126,34 @@ public abstract class StoreObjectMapper {
 				query.first(count);
 			}
 
-			query.build().filter(new EmptyRowFilter<K>()).map(mapper(mapper))
-					.subscribe(new ListObserver<T>(observer));
+			return query.build().filter(new EmptyRowFilter<K>())
+					.map(mapper(mapper)).mapMany(new ListExploder<T>());
 
-		} catch (final Throwable e) {
-			observer.onError(e);
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <K, V, T, M extends RowMapper<K, List<T>>> void loadColumns(
-			final Table<K, V> table, final Class<M> mapper,
-			final Observer<T> observer, final String key, final K start,
-			final K end) {
+	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> loadColumns(
+			final Table<K, V> table, final Class<M> mapper, final String key,
+			final K start, final K end) {
 
 		try {
 
-			store.fetch(database, table, key).start(start).end(end).build()
-					.filter(new EmptyRowFilter<K>()).map(mapper(mapper))
-					.subscribe(new ListObserver<T>(observer));
+			return store.fetch(database, table, key).start(start).end(end)
+					.build().filter(new EmptyRowFilter<K>())
+					.map(mapper(mapper)).mapMany(new ListExploder<T>());
 
-		} catch (final Throwable e) {
-			observer.onError(e);
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <K, V, T, M extends RowMapper<K, T>> void findRows(
+	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> findRows(
 			final Table<K, V> table, final Class<M> mapper,
-			final Observer<T> observer, final Where<K>... clauses) {
+			final Where<K>... clauses) {
 
 		try {
 
@@ -140,60 +164,73 @@ public abstract class StoreObjectMapper {
 				builder.where(where.field, where.value, where.operator);
 			}
 
-			builder.build().filter(new EmptyRowFilter<K>()).map(mapper(mapper))
-					.subscribe(new WrapObserver<T>(observer));
+			return builder.build().filter(new EmptyRowFilter<K>())
+					.map(mapper(mapper));
 
-		} catch (final Throwable e) {
-			observer.onError(e);
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <K, V, T, M extends RowMapper<K, T>> void createRow(
-			final Table<K, V> table, final Class<M> mapper,
-			final Observer<T> observer, final String key, final T obj) {
+	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> createRow(
+			final Table<K, V> table, final Class<M> mapper, final String key,
+			final T obj) {
 
 		try {
 
-			loadRows(table, mapper, new Observer<T>() {
-
-				private boolean found = false;
+			return Observable.create(new Observable.OnSubscribeFunc<T>() {
 
 				@Override
-				public void onNext(final T next) {
-					found = true;
-				}
+				public Subscription onSubscribe(
+						final Observer<? super T> observer) {
 
-				@Override
-				public void onError(final Throwable error) {
-					observer.onError(error);
-				}
+					try {
 
-				@Override
-				public void onCompleted() {
-					if (!found) {
-						try {
-							updateRow(table, mapper, observer, key, obj);
-						} catch (final Throwable e) {
-							observer.onError(e);
-						}
-					} else {
-						observer.onError(new IllegalStateException(
-								"Row key already exists!"));
+						loadRows(table, mapper, key).subscribe(
+								new ExistenceObserver<T>(observer) {
+
+									@Override
+									public void exists(
+											final Observer<? super T> observer) {
+										observer.onError(new Exception(
+												"Object ID already exists"));
+									}
+
+									@Override
+									public void missing(
+											final Observer<? super T> observer) {
+										updateRow(table, mapper, key, obj)
+												.subscribe(observer);
+									}
+
+								});
+
+					} catch (final Throwable t) {
+						observer.onError(t);
 					}
+
+					return new Subscription() {
+
+						@Override
+						public void unsubscribe() {
+						}
+
+					};
+
 				}
 
-			}, key);
+			});
 
-		} catch (final Throwable e) {
-			observer.onError(e);
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <K, V, T, M extends RowMapper<K, T>> void updateRow(
-			final Table<K, V> table, final Class<M> mapper,
-			final Observer<T> observer, final String key, final T obj) {
+	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> updateRow(
+			final Table<K, V> table, final Class<M> mapper, final String key,
+			final T obj) {
 
 		try {
 
@@ -203,18 +240,17 @@ public abstract class StoreObjectMapper {
 			mapper(mapper).encode(obj, mutator);
 			batch.commit();
 
-			observer.onNext(obj);
-			observer.onCompleted();
+			return Observable.from(obj);
 
-		} catch (final Throwable e) {
-			observer.onError(e);
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <K, V, T, M extends RowMapper<K, List<T>>> void updateColumns(
-			final Table<K, V> table, final Class<M> mapper,
-			final Observer<T> observer, final String key, final T... objects) {
+	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> updateColumns(
+			final Table<K, V> table, final Class<M> mapper, final String key,
+			final T... objects) {
 
 		try {
 
@@ -223,19 +259,16 @@ public abstract class StoreObjectMapper {
 			mapper(mapper).encode(Arrays.asList(objects), mutator);
 			batch.commit();
 
-			for (final T object : objects) {
-				observer.onNext(object);
-			}
-			observer.onCompleted();
+			return Observable.from(objects);
 
-		} catch (final Throwable e) {
-			observer.onError(e);
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <K, V> void deleteRows(final Table<K, V> table,
-			final Observer<String> observer, final String... keys) {
+	protected <K, V> Observable<String> deleteRows(final Table<K, V> table,
+			final String... keys) {
 
 		try {
 
@@ -245,19 +278,16 @@ public abstract class StoreObjectMapper {
 			}
 			batch.commit();
 
-			for (final String key : keys) {
-				observer.onNext(key);
-			}
-			observer.onCompleted();
+			return Observable.from(keys);
 
-		} catch (final Throwable e) {
-			observer.onError(e);
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <K, V> void deleteColumns(final Table<K, V> table,
-			final Observer<K> observer, final String key, final K... columns) {
+	protected <K, V> Observable<K> deleteColumns(final Table<K, V> table,
+			final String key, final K... columns) {
 
 		try {
 
@@ -270,70 +300,20 @@ public abstract class StoreObjectMapper {
 
 			batch.commit();
 
-			for (final K column : columns) {
-				observer.onNext(column);
-			}
+			return Observable.from(columns);
 
-			observer.onCompleted();
-
-		} catch (final Throwable e) {
-			observer.onError(e);
+		} catch (final Exception e) {
+			return Observable.error(e);
 		}
 
 	}
 
-	protected <K, T, M extends RowMapper<K, T>> M mapper(final Class<M> cls) {
-		return mappers.instance(cls);
-	}
-
-	private static class WrapObserver<T> extends ChainObserver<T, T> {
-
-		public WrapObserver(final Observer<T> observer_) {
-			super(observer_);
-		}
+	private static class ListExploder<T> implements
+			Func1<List<T>, Observable<T>> {
 
 		@Override
-		public void onNext(final T next) {
-			observer().onNext(next);
-		}
-
-	}
-
-	private static class ListObserver<T> extends ChainObserver<List<T>, T> {
-
-		public ListObserver(final Observer<T> observer_) {
-			super(observer_);
-		}
-
-		@Override
-		public void onNext(final List<T> list) {
-			for (final T t : list) {
-				observer().onNext(t);
-			}
-		}
-
-	}
-
-	private abstract static class ChainObserver<T, U> implements rx.Observer<T> {
-
-		private final Observer<U> observer;
-
-		public ChainObserver(final Observer<U> observer_) {
-			observer = observer_;
-		}
-
-		@Override
-		public void onCompleted() {
-			observer.onCompleted();
-		}
-
-		@Override
-		public void onError(final Throwable e) {
-			observer.onError(e);
-		}
-
-		public Observer<U> observer() {
-			return observer;
+		public Observable<T> call(final List<T> t1) {
+			return Observable.from(t1);
 		}
 
 	}

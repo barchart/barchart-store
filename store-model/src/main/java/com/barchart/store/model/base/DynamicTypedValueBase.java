@@ -19,14 +19,23 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 
 	@JsonProperty
 	public void value(final byte[] value) {
-		encoded = ByteBuffer.wrap(value);
+		if (value != null) {
+			encoded = ByteBuffer.wrap(value);
+		}
 	}
 
 	@JsonProperty
 	public byte[] value() {
-		final byte[] value = encoded.array();
-		encoded.rewind();
+
+		byte[] value = null;
+
+		if (encoded != null) {
+			value = encoded.array();
+			encoded.rewind();
+		}
+
 		return value;
+
 	}
 
 	private void dirty() {
@@ -192,6 +201,9 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 
 	@Override
 	public ByteBuffer asBlob() {
+		if (encoded == null) {
+			return null;
+		}
 		final ByteBuffer clone = ByteBuffer.allocate(encoded.capacity());
 		encoded.rewind();
 		clone.put(encoded);
