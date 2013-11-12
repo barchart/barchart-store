@@ -4,8 +4,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import rx.Observable;
-import rx.Observer;
-import rx.Subscription;
 import rx.util.functions.Func1;
 
 import com.barchart.store.api.Batch;
@@ -177,54 +175,20 @@ public abstract class StoreObjectMapper {
 			final Table<K, V> table, final Class<M> mapper, final String key,
 			final T obj) {
 
-		try {
+		return loadRows(table, mapper, key).isEmpty().mapMany(
+				new Func1<Boolean, Observable<T>>() {
 
-			return Observable.create(new Observable.OnSubscribeFunc<T>() {
-
-				@Override
-				public Subscription onSubscribe(
-						final Observer<? super T> observer) {
-
-					try {
-
-						loadRows(table, mapper, key).subscribe(
-								new ExistenceObserver<T>(observer) {
-
-									@Override
-									public void exists(
-											final Observer<? super T> observer) {
-										observer.onError(new Exception(
-												"Object ID already exists"));
-									}
-
-									@Override
-									public void missing(
-											final Observer<? super T> observer) {
-										updateRow(table, mapper, key, obj)
-												.subscribe(observer);
-									}
-
-								});
-
-					} catch (final Throwable t) {
-						observer.onError(t);
+					@Override
+					public Observable<T> call(final Boolean empty) {
+						if (empty) {
+							return updateRow(table, mapper, key, obj);
+						} else {
+							return Observable.error(new Exception(
+									"Object ID already exists"));
+						}
 					}
 
-					return new Subscription() {
-
-						@Override
-						public void unsubscribe() {
-						}
-
-					};
-
-				}
-
-			});
-
-		} catch (final Exception e) {
-			return Observable.error(e);
-		}
+				});
 
 	}
 
