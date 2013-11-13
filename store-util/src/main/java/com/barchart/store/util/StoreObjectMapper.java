@@ -205,6 +205,7 @@ public abstract class StoreObjectMapper {
 	 * @param clauses Clauses for index searching
 	 * @return A lazy observable that executes on every subscribe
 	 */
+	@SafeVarargs
 	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> findRows(
 			final Table<K, V> table, final Class<M> mapper,
 			final Where<K>... clauses) {
@@ -236,15 +237,15 @@ public abstract class StoreObjectMapper {
 	 * @param obj The object to store
 	 * @return A cached observable that is executed immediately
 	 */
-	protected <K, V, T, U extends T, M extends RowMapper<K, T>> Observable<U> createRow(
+	protected <K, V, T, U extends T, M extends RowMapper<K, T>> Observable<T> createRow(
 			final Table<K, V> table, final Class<M> mapper, final String key,
 			final U obj) {
 
 		return cache(loadRows(table, mapper, key).isEmpty().mapMany(
-				new Func1<Boolean, Observable<U>>() {
+				new Func1<Boolean, Observable<T>>() {
 
 					@Override
-					public Observable<U> call(final Boolean empty) {
+					public Observable<T> call(final Boolean empty) {
 						if (empty) {
 							return updateRow(table, mapper, key, obj);
 						} else {
@@ -266,7 +267,7 @@ public abstract class StoreObjectMapper {
 	 * @param obj The object to store
 	 * @return A cached observable that is executed immediately
 	 */
-	protected <K, V, T, U extends T, M extends RowMapper<K, T>> Observable<U> updateRow(
+	protected <K, V, T, U extends T, M extends RowMapper<K, T>> Observable<T> updateRow(
 			final Table<K, V> table, final Class<M> mapper, final String key,
 			final U obj) {
 
@@ -278,7 +279,7 @@ public abstract class StoreObjectMapper {
 			mapper(mapper).encode(obj, mutator);
 			batch.commit();
 
-			return Observable.from(obj);
+			return Observable.<T> from(obj);
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -295,7 +296,7 @@ public abstract class StoreObjectMapper {
 	 * @param objects The objects to store as columns
 	 * @return A cached observable that is executed immediately
 	 */
-	protected <K, V, T, U extends T, M extends RowMapper<K, List<T>>> Observable<U> updateColumns(
+	protected <K, V, T, U extends T, M extends RowMapper<K, List<T>>> Observable<T> updateColumns(
 			final Table<K, V> table, final Class<M> mapper, final String key,
 			final U... objects) {
 
@@ -306,7 +307,7 @@ public abstract class StoreObjectMapper {
 			mapper(mapper).encode(Arrays.asList((T[]) objects), mutator);
 			batch.commit();
 
-			return Observable.from(objects);
+			return Observable.<T> from(objects);
 
 		} catch (final Exception e) {
 			return Observable.error(e);
