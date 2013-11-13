@@ -388,12 +388,17 @@ public abstract class StoreObjectMapper {
 	 * subscriptions.
 	 */
 	protected static <T> Observable<T> cache(final Observable<T> observable) {
-		observable.cache().subscribe(new Action1<T>() {
+
+		final Observable<T> cached = observable.cache();
+
+		cached.subscribe(new Action1<T>() {
 			@Override
 			public void call(final T t1) {
 			}
 		});
-		return observable;
+
+		return cached;
+
 	}
 
 	protected static String[] toStrings(final List<?> list) {
