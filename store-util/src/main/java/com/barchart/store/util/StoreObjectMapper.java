@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import rx.Observable;
+import rx.util.functions.Action1;
 import rx.util.functions.Func1;
 
 import com.barchart.store.api.Batch;
@@ -58,6 +59,14 @@ public abstract class StoreObjectMapper {
 	 * Helper methods for subclasses.
 	 */
 
+	/**
+	 * Load rows from a store table and convert them to objects.
+	 * 
+	 * @param table The store table
+	 * @param mapper The object mapper
+	 * @param keys The row keys to load
+	 * @return A lazy observable that executes on every subscribe
+	 */
 	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> loadRows(
 			final Table<K, V> table, final Class<M> mapper,
 			final String... keys) {
@@ -71,6 +80,15 @@ public abstract class StoreObjectMapper {
 
 	}
 
+	/**
+	 * Load columns from a table row and convert them to objects.
+	 * 
+	 * @param table The store table
+	 * @param mapper The object mapper
+	 * @param key The row key to load
+	 * @param columns The column names to load
+	 * @return A lazy observable that executes on every subscribe
+	 */
 	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> loadColumns(
 			final Table<K, V> table, final Class<M> mapper, final String key,
 			final K... columns) {
@@ -93,6 +111,15 @@ public abstract class StoreObjectMapper {
 
 	}
 
+	/**
+	 * Load columns from a table row and convert them to objects.
+	 * 
+	 * @param table The store table
+	 * @param mapper The object mapper
+	 * @param key The row key to load
+	 * @param prefix The column name prefix to filter by
+	 * @return A lazy observable that executes on every subscribe
+	 */
 	protected <V, T, M extends RowMapper<String, List<T>>> Observable<T> loadColumnsByPrefix(
 			final Table<String, V> table, final Class<M> mapper,
 			final String key, final String prefix) {
@@ -109,6 +136,16 @@ public abstract class StoreObjectMapper {
 
 	}
 
+	/**
+	 * Load columns from a table row and convert them to objects.
+	 * 
+	 * @param table The store table
+	 * @param mapper The object mapper
+	 * @param key The row key to load
+	 * @param count The number of columns to load in sorted order
+	 * @param reverse Sort descending instead of ascending
+	 * @return A lazy observable that executes on every subscribe
+	 */
 	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> loadColumns(
 			final Table<K, V> table, final Class<M> mapper, final String key,
 			final int count, final boolean reverse) {
@@ -133,6 +170,17 @@ public abstract class StoreObjectMapper {
 
 	}
 
+	/**
+	 * 
+	 * Load a range of columns from a table row and convert them to objects.
+	 * 
+	 * @param table The store table
+	 * @param mapper The object mapper
+	 * @param key The row key to load
+	 * @param start The column name to start the range with
+	 * @param end The column name to end the range with
+	 * @return A lazy observable that executes on every subscribe
+	 */
 	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> loadColumns(
 			final Table<K, V> table, final Class<M> mapper, final String key,
 			final K start, final K end) {
@@ -149,6 +197,14 @@ public abstract class StoreObjectMapper {
 
 	}
 
+	/**
+	 * Find rows based on secondary index values.
+	 * 
+	 * @param table The store table
+	 * @param mapper The object mapper
+	 * @param clauses Clauses for index searching
+	 * @return A lazy observable that executes on every subscribe
+	 */
 	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> findRows(
 			final Table<K, V> table, final Class<M> mapper,
 			final Where<K>... clauses) {
@@ -171,15 +227,24 @@ public abstract class StoreObjectMapper {
 
 	}
 
-	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> createRow(
+	/**
+	 * Create a new row in the store from the specified object.
+	 * 
+	 * @param table The store table
+	 * @param mapper The object mapper
+	 * @param key The row key
+	 * @param obj The object to store
+	 * @return A cached observable that is executed immediately
+	 */
+	protected <K, V, T, U extends T, M extends RowMapper<K, T>> Observable<U> createRow(
 			final Table<K, V> table, final Class<M> mapper, final String key,
-			final T obj) {
+			final U obj) {
 
-		return loadRows(table, mapper, key).isEmpty().mapMany(
-				new Func1<Boolean, Observable<T>>() {
+		return cache(loadRows(table, mapper, key).isEmpty().mapMany(
+				new Func1<Boolean, Observable<U>>() {
 
 					@Override
-					public Observable<T> call(final Boolean empty) {
+					public Observable<U> call(final Boolean empty) {
 						if (empty) {
 							return updateRow(table, mapper, key, obj);
 						} else {
@@ -188,13 +253,22 @@ public abstract class StoreObjectMapper {
 						}
 					}
 
-				});
+				}));
 
 	}
 
-	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> updateRow(
+	/**
+	 * Update a row in the store with the specified object.
+	 * 
+	 * @param table The store table
+	 * @param mapper The object mapper
+	 * @param key The row key
+	 * @param obj The object to store
+	 * @return A cached observable that is executed immediately
+	 */
+	protected <K, V, T, U extends T, M extends RowMapper<K, T>> Observable<U> updateRow(
 			final Table<K, V> table, final Class<M> mapper, final String key,
-			final T obj) {
+			final U obj) {
 
 		try {
 
@@ -212,15 +286,24 @@ public abstract class StoreObjectMapper {
 
 	}
 
-	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> updateColumns(
+	/**
+	 * Load columns from a table row and convert them to objects.
+	 * 
+	 * @param table The store table
+	 * @param mapper The object mapper
+	 * @param key The row key
+	 * @param objects The objects to store as columns
+	 * @return A cached observable that is executed immediately
+	 */
+	protected <K, V, T, U extends T, M extends RowMapper<K, List<T>>> Observable<U> updateColumns(
 			final Table<K, V> table, final Class<M> mapper, final String key,
-			final T... objects) {
+			final U... objects) {
 
 		try {
 
 			final Batch batch = store.batch(database);
 			final RowMutator<K> mutator = batch.row(table, key);
-			mapper(mapper).encode(Arrays.asList(objects), mutator);
+			mapper(mapper).encode(Arrays.asList((T[]) objects), mutator);
 			batch.commit();
 
 			return Observable.from(objects);
@@ -231,6 +314,13 @@ public abstract class StoreObjectMapper {
 
 	}
 
+	/**
+	 * Delete rows from the store by key.
+	 * 
+	 * @param table The store table
+	 * @param keys The row keys to delete
+	 * @return A cached observable that is executed immediately
+	 */
 	protected <K, V> Observable<String> deleteRows(final Table<K, V> table,
 			final String... keys) {
 
@@ -250,6 +340,14 @@ public abstract class StoreObjectMapper {
 
 	}
 
+	/**
+	 * Delete columns from a row in the store.
+	 * 
+	 * @param table The store table
+	 * @param key The row key
+	 * @param columns The column names to delete
+	 * @return A cached observable that is executed immediately
+	 */
 	protected <K, V> Observable<K> deleteColumns(final Table<K, V> table,
 			final String key, final K... columns) {
 
@@ -282,6 +380,19 @@ public abstract class StoreObjectMapper {
 
 		return strings;
 
+	}
+
+	/**
+	 * Auto subscribe to an observable, caching the result for future
+	 * subscriptions.
+	 */
+	protected static <T> Observable<T> cache(final Observable<T> observable) {
+		observable.cache().subscribe(new Action1<T>() {
+			@Override
+			public void call(final T t1) {
+			}
+		});
+		return observable;
 	}
 
 	protected static String[] toStrings(final List<?> list) {
