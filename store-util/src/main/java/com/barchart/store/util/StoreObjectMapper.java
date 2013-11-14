@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import rx.Observable;
-import rx.util.functions.Action1;
+import rx.Observer;
 import rx.util.functions.Func1;
 
 import com.barchart.store.api.Batch;
@@ -391,10 +391,20 @@ public abstract class StoreObjectMapper {
 
 		final Observable<T> cached = observable.cache();
 
-		cached.subscribe(new Action1<T>() {
+		cached.subscribe(new Observer<T>() {
+
 			@Override
-			public void call(final T t1) {
+			public void onCompleted() {
 			}
+
+			@Override
+			public void onError(final Throwable e) {
+			}
+
+			@Override
+			public void onNext(final T args) {
+			}
+
 		});
 
 		return cached;
