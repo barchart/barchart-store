@@ -46,10 +46,14 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 	@Override
 	public T set(final String value) {
 		dirty();
-		try {
-			encoded = ByteBuffer.wrap(value.getBytes("UTF-8"));
-		} catch (final UnsupportedEncodingException e) {
+		if (value == null) {
 			encoded = null;
+		} else {
+			try {
+				encoded = ByteBuffer.wrap(value.getBytes("UTF-8"));
+			} catch (final UnsupportedEncodingException e) {
+				encoded = null;
+			}
 		}
 		return (T) this;
 	}
@@ -58,9 +62,13 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 	@Override
 	public T set(final Boolean value) {
 		dirty();
-		encoded = ByteBuffer.allocate(1);
-		encoded.put(value ? (byte) 1 : (byte) 0);
-		encoded.flip();
+		if (value == null) {
+			encoded = null;
+		} else {
+			encoded = ByteBuffer.allocate(1);
+			encoded.put(value ? (byte) 1 : (byte) 0);
+			encoded.flip();
+		}
 		return (T) this;
 	}
 
@@ -68,9 +76,13 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 	@Override
 	public T set(final Long value) {
 		dirty();
-		encoded = ByteBuffer.allocate(8);
-		encoded.putLong(value);
-		encoded.flip();
+		if (value == null) {
+			encoded = null;
+		} else {
+			encoded = ByteBuffer.allocate(8);
+			encoded.putLong(value);
+			encoded.flip();
+		}
 		return (T) this;
 	}
 
@@ -78,9 +90,13 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 	@Override
 	public T set(final Integer value) {
 		dirty();
-		encoded = ByteBuffer.allocate(4);
-		encoded.putInt(value);
-		encoded.flip();
+		if (value == null) {
+			encoded = null;
+		} else {
+			encoded = ByteBuffer.allocate(4);
+			encoded.putInt(value);
+			encoded.flip();
+		}
 		return (T) this;
 	}
 
@@ -88,9 +104,13 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 	@Override
 	public T set(final Double value) {
 		dirty();
-		encoded = ByteBuffer.allocate(8);
-		encoded.putDouble(value);
-		encoded.flip();
+		if (value == null) {
+			encoded = null;
+		} else {
+			encoded = ByteBuffer.allocate(8);
+			encoded.putDouble(value);
+			encoded.flip();
+		}
 		return (T) this;
 	}
 
@@ -98,7 +118,11 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 	@Override
 	public T set(final Date value) {
 		dirty();
-		set(value.getTime());
+		if (value == null) {
+			encoded = null;
+		} else {
+			set(value.getTime());
+		}
 		return (T) this;
 	}
 
@@ -106,11 +130,15 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 	@Override
 	public T set(final ByteBuffer value) {
 		dirty();
-		encoded = ByteBuffer.allocate(value.capacity());
-		value.rewind();
-		encoded.put(value);
-		value.rewind();
-		encoded.flip();
+		if (value == null) {
+			encoded = null;
+		} else {
+			encoded = ByteBuffer.allocate(value.capacity());
+			value.rewind();
+			encoded.put(value);
+			value.rewind();
+			encoded.flip();
+		}
 		return (T) this;
 	}
 
