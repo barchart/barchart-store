@@ -1,0 +1,9 @@
+## Copy this file to "cassandra.store" and enter your cluster
+## configuration details below to run unit tests
+
+# Seed nodes
+seeds=node1.example.com,node2.example.com
+
+# User with privileges to create new keyspaces / column families
+username=cassandra
+password=cassandra

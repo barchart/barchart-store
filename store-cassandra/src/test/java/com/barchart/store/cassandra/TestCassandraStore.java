@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -324,11 +325,20 @@ public class TestCassandraStore {
 
 	@BeforeClass
 	public static void setUp() throws Exception {
+
+		final Properties props = new Properties();
+		props.load(TestCassandraStore.class
+				.getResourceAsStream("/cassandra.store"));
+
+		final String[] seeds = props.get("seeds").toString().split(",");
+		final String username = props.get("username").toString();
+		final String password = props.get("password").toString();
+
 		store = new CassandraStore();
-		store.setSeeds("eqx01.chicago.b.cassandra.eqx.barchart.com",
-				"eqx02.chicago.b.cassandra.eqx.barchart.com");
-		store.setCredentials("cassandra", "Erpe5PXRQmG1gVOpnvmiEwNjqCz3Qw3o");
+		store.setSeeds(seeds);
+		store.setCredentials(username, password);
 		store.connect();
+
 		keyspace = randomName();
 		store.create(keyspace);
 		try {
