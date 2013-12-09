@@ -11,6 +11,8 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import rx.Observable;
 import rx.Observer;
@@ -74,12 +76,15 @@ public class CassandraStore implements StoreService {
 			"eqx02.chicago.b.cassandra.eqx.barchart.com",
 			"eqx01.chicago.b.cassandra.eqx.barchart.com",
 			"aws01.us-east-1.b.cassandra.aws.barchart.com",
-			"aws02.us-east-1.b.cassandra.aws.barchart.com" };
+			"aws02.us-east-1.b.cassandra.aws.barchart.com"
+	};
 
 	private String clusterName = "b";
 
 	private String strategyClass = "NetworkTopologyStrategy";
-	private String[] zones = { "chicago", "us-east-1" };
+	private String[] zones = {
+			"chicago", "us-east-1"
+	};
 	private int replicationFactor = 2;
 	private ConsistencyLevel readConsistency = ConsistencyLevel.CL_ONE;
 	private ConsistencyLevel writeConsistency = ConsistencyLevel.CL_ONE;
@@ -92,7 +97,7 @@ public class CassandraStore implements StoreService {
 	static private AstyanaxContext<Cluster> clusterContext = null;
 
 	public CassandraStore() {
-		this(Executors.newCachedThreadPool());
+		this(Executors.newCachedThreadPool(new DaemonFactory()));
 	}
 
 	public CassandraStore(final ExecutorService executor) {
@@ -1251,6 +1256,21 @@ public class CassandraStore implements StoreService {
 					});
 
 		}
+	}
+
+	private static class DaemonFactory implements ThreadFactory {
+
+		private static final AtomicInteger threadNumber = new AtomicInteger(1);
+
+		@Override
+		public Thread newThread(final Runnable r) {
+			final Thread t =
+					new Thread(r, "cassandra-query-"
+							+ threadNumber.getAndIncrement());
+			t.setDaemon(true);
+			return t;
+		}
+
 	}
 
 }
