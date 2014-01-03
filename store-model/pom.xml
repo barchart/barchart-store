@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>com.barchart.base</groupId>
 		<artifactId>barchart-archon</artifactId>
-		<version>2.5.16</version>
+		<version>2.5.18</version>
 		<relativePath />
 	</parent>
 
@@ -38,7 +38,6 @@ Data store model helpers
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
-			<version>[2.1,2.2-rc1)</version>
 		</dependency>
 		
 	</dependencies>
