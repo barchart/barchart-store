@@ -2,6 +2,7 @@ package com.barchart.store.model.api;
 
 import java.nio.ByteBuffer;
 import java.util.Date;
+import java.util.List;
 
 /**
  * An individual account permission.
@@ -12,6 +13,11 @@ public interface DynamicTypedValue<T extends DynamicTypedValue<T>> {
 	 * Set a String value.
 	 */
 	T set(String value);
+
+	/**
+	 * Set a String list. Each String value should not exceed 65,535 bytes.
+	 */
+	T set(List<String> value);
 
 	/**
 	 * Set a boolean value.
@@ -47,6 +53,11 @@ public interface DynamicTypedValue<T extends DynamicTypedValue<T>> {
 	 * Get the permission value as a String.
 	 */
 	String asString();
+
+	/**
+	 * Get the permission value as a list of Strings.
+	 */
+	List<String> asStringList();
 
 	/**
 	 * Get the permission value as a boolean.

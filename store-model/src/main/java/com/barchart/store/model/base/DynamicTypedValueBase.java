@@ -3,7 +3,9 @@ package com.barchart.store.model.base;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import com.barchart.store.model.api.DynamicTypedValue;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -56,6 +58,54 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 			}
 		}
 		return (T) this;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public T set(final List<String> list) {
+
+		dirty();
+
+		if (list == null) {
+			encoded = null;
+		} else {
+
+			try {
+
+				int length = 0;
+				final byte[][] bytes = new byte[list.size()][];
+
+				for (int i = 0; i < list.size(); i++) {
+
+					bytes[i] = list.get(i).getBytes("UTF-8");
+
+					if (bytes[i].length > 65535) {
+						throw new IllegalArgumentException(
+								"String value too large: " + bytes[i].length
+										+ " (65535 max)");
+					}
+
+					length += 2 + bytes[i].length;
+
+				}
+
+				encoded = ByteBuffer.allocate(length);
+
+				for (final byte[] b : bytes) {
+					encoded.putShort((short) b.length);
+					encoded.put(b);
+				}
+
+				encoded.flip();
+
+			} catch (final UnsupportedEncodingException e) {
+				encoded = null;
+			}
+
+		}
+
+		return (T) this;
+
 	}
 
 	@SuppressWarnings("unchecked")
@@ -155,6 +205,43 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> implements
 		encoded.rewind();
 		last = value;
 		return value;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<String> asStringList() {
+
+		if (last != null && last instanceof List) {
+			return (List<String>) last;
+		}
+
+		if (encoded == null) {
+			return null;
+		}
+
+		final List<String> list = new ArrayList<String>();
+
+		while (encoded.hasRemaining()) {
+
+			final short len = encoded.getShort();
+
+			if (len < 0) {
+				throw new IllegalStateException("Got invalid length marker: "
+						+ len);
+			}
+
+			list.add(Charset.forName("UTF-8")
+					.decode((ByteBuffer) encoded.slice().limit(len)).toString());
+
+			encoded.position(encoded.position() + len);
+
+		}
+
+		encoded.rewind();
+		last = list;
+
+		return list;
+
 	}
 
 	@Override
