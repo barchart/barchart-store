@@ -11,6 +11,7 @@ import java.util.concurrent.Callable;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.barchart.store.api.Batch;
@@ -23,8 +24,8 @@ import com.barchart.util.test.concurrent.CallableTest;
 import com.barchart.util.test.concurrent.TestObserver;
 import com.netflix.astyanax.util.TimeUUIDUtils;
 
-// Tests should be reliable now on Jenkins
-//@Ignore
+// Creates a ton of keyspaces which slows down C* repairs
+@Ignore
 public class TestCassandraStore {
 
 	private static String keyspace;
