@@ -94,7 +94,7 @@ public class CassandraStore implements StoreService {
 
 	private final ExecutorService executor;
 
-	static private AstyanaxContext<Cluster> clusterContext = null;
+	private AstyanaxContext<Cluster> clusterContext = null;
 
 	public CassandraStore() {
 		this(Executors.newCachedThreadPool(new DaemonFactory()));
@@ -701,7 +701,7 @@ public class CassandraStore implements StoreService {
 		}
 	}
 
-	private static abstract class CassandraBaseRowQuery<T> implements
+	private abstract class CassandraBaseRowQuery<T> implements
 			ObservableQueryBuilder<T> {
 
 		protected final Keyspace keyspace;
@@ -817,7 +817,7 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private static class CassandraSingleRowQuery<T> extends
+	private class CassandraSingleRowQuery<T> extends
 			CassandraBaseRowQuery<T> {
 
 		private final String key;
@@ -900,7 +900,7 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private static class CassandraMultiRowQuery<T> extends
+	private class CassandraMultiRowQuery<T> extends
 			CassandraBaseRowQuery<T> {
 
 		private final String[] keys;
@@ -986,7 +986,7 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private static class CassandraAllRowsQuery<T> extends
+	private class CassandraAllRowsQuery<T> extends
 			CassandraBaseRowQuery<T> {
 
 		private CassandraAllRowsQuery(final String database_,
@@ -1083,7 +1083,7 @@ public class CassandraStore implements StoreService {
 		}
 	}
 
-	private static class CassandraSearchQuery<T> extends
+	private class CassandraSearchQuery<T> extends
 			CassandraBaseRowQuery<T> implements ObservableIndexQueryBuilder<T> {
 
 		Map<T, List<ValueCompare>> filters;
