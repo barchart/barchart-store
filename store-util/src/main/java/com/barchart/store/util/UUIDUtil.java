@@ -11,8 +11,12 @@ public final class UUIDUtil {
 	private static final long NUM_100NS_INTERVALS_SINCE_UUID_EPOCH =
 			0x01b21dd213814000L;
 
-	public static final UUID timeUUID(final long time) {
+	public static final UUID timeUUID() {
 		return new UUID(UUIDGen.newTime(), UUIDGen.getClockSeqAndNode());
+	}
+
+	public static final UUID timeUUID(final long time) {
+		return new UUID(UUIDGen.createTime(time), UUIDGen.getClockSeqAndNode());
 	}
 
 	public static final long timestampFrom(final UUID uuid) {
