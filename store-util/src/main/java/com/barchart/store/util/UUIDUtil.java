@@ -10,7 +10,6 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Enumeration;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 
 public final class UUIDUtil {
 
@@ -27,11 +26,6 @@ public final class UUIDUtil {
      * The current clock and node value.
      */
     private static long clockSeqAndNode = 0x8000000000000000L;
-    
-    /**
-     * UUID creation counter, increment on every UUID creation
-     */
-    private static AtomicLong sequence = new AtomicLong(0)  ;
     
     private UUIDUtil() {
     	
@@ -208,8 +202,18 @@ public final class UUIDUtil {
 
         // Skip the clock sequence generation process and use random instead.
 
-       clockSeqAndNode |= (long) ((Math.random() * 0x3FFF) + sequence.getAndIncrement()) << 48;
+       clockSeqAndNode |= (long) ((Math.random() * 0x3FFF) + 1) << 48;
 
+    }
+    
+    public static void main(final String[] args) {
+    	UUID t1 = timeUUID(10000);
+    	UUID t2 = timeUUID(10000);
+    	UUID t3 = timeUUID(10000);
+    	
+    	System.out.println(t1.getMostSignificantBits() + " " + t1.getLeastSignificantBits());
+    	System.out.println(t2.getMostSignificantBits() + " " + t2.getLeastSignificantBits());
+    	System.out.println(t3.getMostSignificantBits() + " " + t3.getLeastSignificantBits());
     }
     
     /**
@@ -218,8 +222,8 @@ public final class UUIDUtil {
      * @return the clockSeqAndNode value
      * @see UUID#getClockSeqAndNode()
      */
-    private static long getClockSeqAndNode() {
-    	clockSeqAndNode |= (((clockSeqAndNode & 0x3FFF000000000000L) >>> 48) + sequence.getAndIncrement()) << 48;
+    private static synchronized long getClockSeqAndNode() {
+    	clockSeqAndNode |= (((clockSeqAndNode & 0x3FFF000000000000L) >>> 48) + 1) << 48;
         return clockSeqAndNode;
     }
 	
