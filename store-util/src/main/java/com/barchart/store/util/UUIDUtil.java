@@ -28,7 +28,7 @@ public final class UUIDUtil {
      */
     private static long clockSeqAndNode = 0x8000000000000000L;
     
-    private static AtomicLong sequence = new AtomicLong(0); 
+    private static AtomicLong sequence = new AtomicLong((long)Math.random() * 0x3FFF); 
     
     private UUIDUtil() {
     	
