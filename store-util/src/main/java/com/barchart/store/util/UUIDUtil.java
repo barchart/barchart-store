@@ -66,7 +66,7 @@ public final class UUIDUtil {
      * @return
      */
 	public static final UUID timeUUIDMax(final long time) {
-		return new UUID(createTime(time), Long.MAX_VALUE);
+		return new UUID(createTime(time), Long.MAX_VALUE);	
 	}
 
 	public static final long timestampFrom(final UUID uuid) {
@@ -213,7 +213,7 @@ public final class UUIDUtil {
     }
     
     /**
-     * Returns the current clockSeqAndNode value.
+     * Increments the sequence and returns the new clockSeqAndNode value.
      *
      * @return the clockSeqAndNode value
      * @see UUID#getClockSeqAndNode()
