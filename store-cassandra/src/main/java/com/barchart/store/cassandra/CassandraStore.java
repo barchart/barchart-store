@@ -624,6 +624,11 @@ public class CassandraStore implements StoreService {
 			return null;
 		}
 
+		@Override
+		public int compareTo(final StoreRow<T> o) {
+			return key.compareTo(o.getKey());
+		}
+
 	}
 
 	private static final class StoreColumnImpl<T> implements StoreColumn<T> {

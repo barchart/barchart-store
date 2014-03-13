@@ -17,17 +17,21 @@ import com.barchart.store.api.StoreService.Table;
 
 public abstract class StoreObjectMapper {
 
-	private final StoreService store;
-	private final String database;
-	private final StoreSchema schema;
+	protected final StoreService store;
+	protected final String database;
+	protected final StoreSchema schema;
+
 	private final MapperFactory mappers;
 
 	public StoreObjectMapper(final StoreService store_, final String database_,
 			final StoreSchema schema_) {
+
 		store = store_;
 		database = database_;
 		schema = schema_;
+
 		mappers = new MapperFactory();
+
 	}
 
 	/**
@@ -61,7 +65,7 @@ public abstract class StoreObjectMapper {
 
 	/**
 	 * Load rows from a store table and convert them to objects.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param mapper The object mapper
 	 * @param keys The row keys to load
@@ -82,7 +86,7 @@ public abstract class StoreObjectMapper {
 
 	/**
 	 * Load columns from a table row and convert them to objects.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param mapper The object mapper
 	 * @param key The row key to load
@@ -113,7 +117,7 @@ public abstract class StoreObjectMapper {
 
 	/**
 	 * Load columns from a table row and convert them to objects.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param mapper The object mapper
 	 * @param key The row key to load
@@ -138,7 +142,7 @@ public abstract class StoreObjectMapper {
 
 	/**
 	 * Load columns from a table row and convert them to objects.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param mapper The object mapper
 	 * @param key The row key to load
@@ -171,9 +175,9 @@ public abstract class StoreObjectMapper {
 	}
 
 	/**
-	 * 
+	 *
 	 * Load a range of columns from a table row and convert them to objects.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param mapper The object mapper
 	 * @param key The row key to load
@@ -199,7 +203,7 @@ public abstract class StoreObjectMapper {
 
 	/**
 	 * Find rows based on secondary index values.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param mapper The object mapper
 	 * @param clauses Clauses for index searching
@@ -230,7 +234,7 @@ public abstract class StoreObjectMapper {
 
 	/**
 	 * Create a new row in the store from the specified object.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param mapper The object mapper
 	 * @param key The row key
@@ -260,7 +264,7 @@ public abstract class StoreObjectMapper {
 
 	/**
 	 * Update a row in the store with the specified object.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param mapper The object mapper
 	 * @param key The row key
@@ -289,7 +293,7 @@ public abstract class StoreObjectMapper {
 
 	/**
 	 * Load columns from a table row and convert them to objects.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param mapper The object mapper
 	 * @param key The row key
@@ -317,7 +321,7 @@ public abstract class StoreObjectMapper {
 
 	/**
 	 * Delete rows from the store by key.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param keys The row keys to delete
 	 * @return A cached observable that is executed immediately
@@ -343,7 +347,7 @@ public abstract class StoreObjectMapper {
 
 	/**
 	 * Delete columns from a row in the store.
-	 * 
+	 *
 	 * @param table The store table
 	 * @param key The row key
 	 * @param columns The column names to delete
@@ -423,8 +427,11 @@ public abstract class StoreObjectMapper {
 
 	}
 
-	private static class ListExploder<T> implements
+	protected static class ListExploder<T> implements
 			Func1<List<T>, Observable<T>> {
+
+		public ListExploder() {
+		}
 
 		@Override
 		public Observable<T> call(final List<T> t1) {
@@ -439,7 +446,7 @@ public abstract class StoreObjectMapper {
 		private final Object value;
 		private final Operator operator;
 
-		private Where(final T field_, final Object value_,
+		public Where(final T field_, final Object value_,
 				final Operator operator_) {
 			field = field_;
 			value = value_;

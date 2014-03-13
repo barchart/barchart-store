@@ -169,6 +169,11 @@ public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
 			return null;
 		}
 
+		@Override
+		public int compareTo(final StoreRow<T> o) {
+			return getKey().compareTo(o.getKey());
+		}
+
 	}
 
 }

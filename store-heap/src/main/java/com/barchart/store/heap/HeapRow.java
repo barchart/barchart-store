@@ -80,4 +80,9 @@ public class HeapRow<K> implements StoreRow<K> {
 		return false;
 	}
 
+	@Override
+	public int compareTo(final StoreRow<K> o) {
+		return key.compareTo(o.getKey());
+	}
+
 }

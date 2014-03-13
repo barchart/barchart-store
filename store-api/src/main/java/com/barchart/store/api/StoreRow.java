@@ -4,11 +4,11 @@ import java.util.Collection;
 
 /**
  * A single row from the data store, containing multiple columns of data.
- * 
+ *
  * @param <T>
  *            The column key data type
  */
-public interface StoreRow<T> {
+public interface StoreRow<T> extends Comparable<StoreRow<T>> {
 
 	/**
 	 * The unique row key.
