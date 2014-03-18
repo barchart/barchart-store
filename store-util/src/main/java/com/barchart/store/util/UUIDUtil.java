@@ -27,6 +27,8 @@ public final class UUIDUtil {
 	 * The current clock sequences and node value.
 	 */
     private static long clockSeqAndNode = 0x8000000000000000L;
+	private static long minClockSeqAndNode = 0x8000000000000000L;
+	private static long maxClockSeqAndNode = 0xBFFFFFFFFFFFFFFFL;
 
 	/**
 	 * Local node sequence number
@@ -60,7 +62,7 @@ public final class UUIDUtil {
 	 * @return
 	 */
 	public static final UUID timeUUIDMin(final long time) {
-		return new UUID(createTime(time), Long.MIN_VALUE);
+		return new UUID(createTime(time), minClockSeqAndNode);
 	}
 
 	/**
@@ -70,7 +72,7 @@ public final class UUIDUtil {
 	 * @return
 	 */
 	public static final UUID timeUUIDMax(final long time) {
-		return new UUID(createTime(time), Long.MAX_VALUE);
+		return new UUID(createTime(time), maxClockSeqAndNode);
 	}
 
 	public static final long timestampFrom(final UUID uuid) {
