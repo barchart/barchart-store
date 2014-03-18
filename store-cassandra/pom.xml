@@ -48,12 +48,6 @@ Cassandra data store implementation and OSGI components
 		</dependency>
 
 		<dependency>
-		    <groupId>com.eaio.uuid</groupId>
-		    <artifactId>uuid</artifactId>
-		    <scope>test</scope>
-		</dependency>
-
-		<dependency>
 			<groupId>com.barchart.util</groupId>
 			<artifactId>barchart-util-test</artifactId>
 			<scope>test</scope>
