@@ -95,24 +95,6 @@ public interface StoreService {
 	<R extends Comparable<R>, C extends Comparable<C>, V> void update(String database, Table<R, C, V> table)
 			throws Exception;
 
-	// TODO investigate applying secondary indexes to other column key/value
-	// types?
-
-	/**
-	 * Create the specified table with a defined set of columns (useful for
-	 * secondary indexes).
-	 */
-	// <R extends Comparable<R>> void create(String database, Table<R, String,
-	// String> table, Table.Column... columns) throws Exception;
-
-	/**
-	 * Update an existing table definition with a defined set of columns.
-	 */
-	// <R extends Comparable<R>> void update(String database, Table<R, String,
-	// String> table, Table.Column... columns) throws Exception;
-
-	// END TODO
-
 	/**
 	 * Delete all data in the specified table, but do not remove the table.
 	 */

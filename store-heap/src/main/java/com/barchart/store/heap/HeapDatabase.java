@@ -50,18 +50,6 @@ public class HeapDatabase {
 		return new HeapTable<R, C, V>(table);
 	}
 
-	/*
-	 * public <R extends Comparable<R>> void create(final Table<R, String,
-	 * String> table, final ColumnDef... columns) throws Exception { final
-	 * HeapTable<R, String, String> heapTable = new IndexedHeapTable<R,
-	 * String>(columns); tableMap.put(table.name(), heapTable); }
-	 *
-	 * public <R extends Comparable<R>> void update(final Table<R, String,
-	 * String> table, final ColumnDef... columns) throws Exception { throw new
-	 * UnsupportedOperationException(
-	 * "Drop and recreate table to change type or column definitions"); }
-	 */
-
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void truncate(final Table<R, C, V> table)
 			throws Exception {
 		tableMap.get(table.name()).truncate();

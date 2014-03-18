@@ -11,6 +11,7 @@ import java.util.concurrent.Callable;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.barchart.store.api.Batch;
@@ -24,7 +25,7 @@ import com.netflix.astyanax.model.ConsistencyLevel;
 import com.netflix.astyanax.util.TimeUUIDUtils;
 
 // Low entropy, run manually on functional updates
-//@Ignore
+@Ignore
 public class TestCassandraStore {
 
 	private static final String KEYSPACE = "store_unit_test";

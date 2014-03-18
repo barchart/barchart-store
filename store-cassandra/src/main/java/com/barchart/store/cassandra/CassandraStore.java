@@ -14,9 +14,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
@@ -74,8 +71,6 @@ import com.netflix.astyanax.thrift.ThriftFamilyFactory;
 import com.netflix.astyanax.util.RangeBuilder;
 
 public class CassandraStore implements StoreService {
-
-	private final Logger log = LoggerFactory.getLogger(getClass());
 
 	private String[] seeds = new String[] {
 			"eqx02.chicago.b.cassandra.eqx.barchart.com",
@@ -256,15 +251,6 @@ public class CassandraStore implements StoreService {
 						getCFOptions(table));
 	}
 
-	/*
-	 * @Override public <R extends Comparable<R>> void create(final String
-	 * keyspace, final Table<R, String, String> table, final ColumnDef...
-	 * columns) throws ConnectionException { clusterContext .getClient()
-	 * .getKeyspace(keyspace) .createColumnFamily( new ColumnFamily<R,
-	 * String>(table.name, serializerFor(table.rowType), // Row key
-	 * StringSerializer.get()), // Column key getCFOptions(table, columns)); }
-	 */
-
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void update(final String keyspace,
 			final Table<R, C, V> table) throws Exception {
@@ -277,16 +263,6 @@ public class CassandraStore implements StoreService {
 								serializerFor(table.columnType())),
 						getCFOptions(table));
 	}
-
-	/*
-	 * @Override public <R extends Comparable<R>> void update(final String
-	 * keyspace, final Table<R, String, String> table, final ColumnDef...
-	 * columns) throws Exception { clusterContext .getClient()
-	 * .getKeyspace(keyspace) .updateColumnFamily( new ColumnFamily<R,
-	 * String>(table.name, serializerFor(table.rowType), // Row key
-	 * StringSerializer.get()),// Column serializer getCFOptions(table,
-	 * columns)); }
-	 */
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void truncate(final String keyspace,
