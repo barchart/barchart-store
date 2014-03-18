@@ -11,11 +11,9 @@ import java.util.concurrent.Callable;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.barchart.store.api.Batch;
-import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.ObservableIndexQueryBuilder.Operator;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreRow;
@@ -26,20 +24,51 @@ import com.netflix.astyanax.model.ConsistencyLevel;
 import com.netflix.astyanax.util.TimeUUIDUtils;
 
 // Low entropy, run manually on functional updates
-@Ignore
+//@Ignore
 public class TestCassandraStore {
 
 	private static final String KEYSPACE = "store_unit_test";
 
-	private static final Table<String, String, String> DEFAULT_TABLE = Table.make("default");
+	private static final Table<String, String, String> DEFAULT_TABLE =
+			Table.builder("default").build();
+
 	private static final Table<String, UUID, String> UUID_COL_TABLE =
-			Table.make("uuid", String.class, UUID.class, String.class);
+			Table.builder("uuid")
+					.rowKey(String.class)
+					.columnKey(UUID.class)
+					.defaultType(String.class)
+					.build();
+
 	private static final Table<Integer, String, String> INT_ROW_TABLE =
-			Table.make("introw", Integer.class, String.class, String.class);
-	private static final Table<String, String, String> INDEX_TABLE = Table.make("index");
+			Table.builder("introw")
+					.rowKey(Integer.class)
+					.columnKey(String.class)
+					.defaultType(String.class)
+					.build();
+
+	private static final Table<Integer, Integer, String> INT_ROW_COL_TABLE =
+			Table.builder("introwcol")
+					.rowKey(Integer.class)
+					.columnKey(Integer.class)
+					.defaultType(String.class)
+					.build();
+
+	private static final Table<String, String, String> INDEX_TABLE =
+			Table.builder("index")
+					.column("field", String.class, true)
+					.column("num", Integer.class, true)
+					.build();
+
+	private static final Table<Integer, Integer, String> EXPLICIT_INT_TABLE =
+			Table.builder("explicit")
+					.rowKey(Integer.class)
+					.columnKey(Integer.class)
+					.column(1234, String.class, false)
+					.column(1111, Integer.class, false)
+					.build();
 
 	private static final Table<?, ?, ?>[] TABLES = new Table<?, ?, ?>[] {
-			DEFAULT_TABLE, UUID_COL_TABLE, INT_ROW_TABLE, INDEX_TABLE
+			DEFAULT_TABLE, UUID_COL_TABLE, INT_ROW_TABLE, INT_ROW_COL_TABLE, INDEX_TABLE
 	};
 
 	private static CassandraStore store;
@@ -160,6 +189,32 @@ public class TestCassandraStore {
 		assertEquals(obs.results.get(0).get("key").getString(), "value");
 
 		store.fetch(KEYSPACE, INT_ROW_TABLE, 1111).build().subscribe(obs.reset());
+
+		assertEquals(null, obs.sync().error);
+		assertEquals(1, obs.results.size());
+		assertEquals(0, obs.results.get(0).columns().size());
+
+	}
+
+	@Test
+	public void testIntRowCol() throws Exception {
+
+		final Batch batch = store.batch(KEYSPACE);
+		batch.row(INT_ROW_COL_TABLE, 1234).set(1234, "value");
+		batch.commit();
+
+		Thread.sleep(100);
+
+		final TestObserver<StoreRow<Integer, Integer>> obs = TestObserver.create();
+
+		store.fetch(KEYSPACE, INT_ROW_COL_TABLE, 1234).build().subscribe(obs);
+
+		assertEquals(null, obs.sync().error);
+		assertEquals(1, obs.results.size());
+		assertEquals(1234, (int) obs.results.get(0).getKey());
+		assertEquals(obs.results.get(0).get(1234).getString(), "value");
+
+		store.fetch(KEYSPACE, INT_ROW_COL_TABLE, 1111).build().subscribe(obs.reset());
 
 		assertEquals(null, obs.sync().error);
 		assertEquals(1, obs.results.size());
@@ -313,6 +368,11 @@ public class TestCassandraStore {
 
 	}
 
+	@Test(expected = IllegalArgumentException.class)
+	public void testExplictNonStringColumns() throws Exception {
+		store.create(KEYSPACE, EXPLICIT_INT_TABLE);
+	}
+
 	@Before
 	public void prepare() throws Exception {
 		observer = new TestObserver<StoreRow<String, String>>();
@@ -345,51 +405,6 @@ public class TestCassandraStore {
 				@Override
 				public Boolean call() throws Exception {
 					return store.has(KEYSPACE);
-				}
-			}, 5000);
-		}
-
-		// Special def
-		if (!store.has(KEYSPACE, INDEX_TABLE)) {
-			store.create(KEYSPACE, INDEX_TABLE, new ColumnDef() {
-
-				@Override
-				public String key() {
-					return "field";
-				}
-
-				@Override
-				public boolean isIndexed() {
-					return true;
-				}
-
-				@Override
-				public Class<?> type() {
-					return String.class;
-				}
-
-			}, new ColumnDef() {
-
-				@Override
-				public String key() {
-					return "num";
-				}
-
-				@Override
-				public boolean isIndexed() {
-					return true;
-				}
-
-				@Override
-				public Class<?> type() {
-					return Integer.class;
-				}
-
-			});
-			CallableTest.waitFor(new Callable<Boolean>() {
-				@Override
-				public Boolean call() throws Exception {
-					return store.has(KEYSPACE, INDEX_TABLE);
 				}
 			}, 5000);
 		}

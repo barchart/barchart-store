@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.barchart.store.api.Batch;
-import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.RowMutator;
@@ -25,13 +24,13 @@ public class HeapDatabase {
 
 	public <R extends Comparable<R>, C extends Comparable<C>, V> boolean has(final Table<R, C, V> table)
 			throws Exception {
-		return tableMap.containsKey(table.name);
+		return tableMap.containsKey(table.name());
 	}
 
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void create(final Table<R, C, V> table)
 			throws Exception {
-		final HeapTable<R, C, V> heapTable = new HeapTable<R, C, V>();
-		tableMap.put(table.name, heapTable);
+		final HeapTable<R, C, V> heapTable = table(table);
+		tableMap.put(table.name(), heapTable);
 	}
 
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void update(final Table<R, C, V> table)
@@ -40,27 +39,37 @@ public class HeapDatabase {
 				"Drop and recreate table to change type or column definitions");
 	}
 
-	public <R extends Comparable<R>> void create(final Table<R, String, String> table,
-			final ColumnDef... columns) throws Exception {
-		final HeapTable<R, String, String> heapTable =
-				new IndexedHeapTable<R, String>(columns);
-		tableMap.put(table.name, heapTable);
+	private <R extends Comparable<R>, C extends Comparable<C>, V> HeapTable<R, C, V> table(final Table<R, C, V> table) {
+		if (table.columns().size() > 0) {
+			for (final Table.Column<?> c : table.columns()) {
+				if (c.isIndexed()) {
+					return new IndexedHeapTable<R, C, V>(table);
+				}
+			}
+		}
+		return new HeapTable<R, C, V>(table);
 	}
 
-	public <R extends Comparable<R>> void update(final Table<R, String, String> table,
-			final ColumnDef... columns) throws Exception {
-		throw new UnsupportedOperationException(
-				"Drop and recreate table to change type or column definitions");
-	}
+	/*
+	 * public <R extends Comparable<R>> void create(final Table<R, String,
+	 * String> table, final ColumnDef... columns) throws Exception { final
+	 * HeapTable<R, String, String> heapTable = new IndexedHeapTable<R,
+	 * String>(columns); tableMap.put(table.name(), heapTable); }
+	 *
+	 * public <R extends Comparable<R>> void update(final Table<R, String,
+	 * String> table, final ColumnDef... columns) throws Exception { throw new
+	 * UnsupportedOperationException(
+	 * "Drop and recreate table to change type or column definitions"); }
+	 */
 
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void truncate(final Table<R, C, V> table)
 			throws Exception {
-		tableMap.get(table.name).truncate();
+		tableMap.get(table.name()).truncate();
 	}
 
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void delete(final Table<R, C, V> table)
 			throws Exception {
-		tableMap.remove(table.name);
+		tableMap.remove(table.name());
 	}
 
 	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableQueryBuilder<R, C> fetch(
@@ -83,15 +92,15 @@ public class HeapDatabase {
 		try {
 			@SuppressWarnings("unchecked")
 			final HeapTable<R, C, V> ht =
-					(HeapTable<R, C, V>) tableMap.get(table.name);
+					(HeapTable<R, C, V>) tableMap.get(table.name());
 			if (ht == null) {
-				throw new IllegalStateException("No table \"" + table.name
+				throw new IllegalStateException("No table \"" + table.name()
 						+ "\" found in database: \"" + databaseName + "\"");
 			}
 			return ht;
 		} catch (final ClassCastException cce) {
 			throw new IllegalStateException("Wrong table type for \""
-					+ table.name + "\" in database \"" + databaseName + "\"");
+					+ table.name() + "\" in database \"" + databaseName + "\"");
 		}
 	}
 

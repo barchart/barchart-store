@@ -9,7 +9,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.barchart.store.api.Batch;
-import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.ObservableIndexQueryBuilder.Operator;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreRow;
@@ -19,8 +18,7 @@ import com.barchart.util.test.concurrent.TestObserver;
 public class TestHeapStore {
 
 	private static final String KEYSPACE = "cs_unit_test";
-	private static final Table<String, String, String> TABLE = Table
-			.make("cs_test_table");
+	private static final Table<String, String, String> TABLE = Table.builder("cs_test_table").build();
 
 	private TestObserver<StoreRow<String, String>> observer;
 	private HeapStore store;
@@ -255,41 +253,13 @@ public class TestHeapStore {
 	@Test
 	public void testIndexQuery() throws Exception {
 
-		store.create(KEYSPACE, TABLE, new ColumnDef() {
-
-			@Override
-			public String key() {
-				return "field";
-			}
-
-			@Override
-			public boolean isIndexed() {
-				return true;
-			}
-
-			@Override
-			public Class<?> type() {
-				return String.class;
-			}
-
-		}, new ColumnDef() {
-
-			@Override
-			public String key() {
-				return "num";
-			}
-
-			@Override
-			public boolean isIndexed() {
-				return true;
-			}
-
-			@Override
-			public Class<?> type() {
-				return Integer.class;
-			}
-
-		});
+		store.create(KEYSPACE, Table.builder(TABLE.name())
+				.rowKey(String.class)
+				.columnKey(String.class)
+				.defaultType(String.class)
+				.column("field", String.class, true)
+				.column("num", Integer.class, true)
+				.build());
 
 		Thread.sleep(100);
 
@@ -320,6 +290,52 @@ public class TestHeapStore {
 
 		assertEquals(null, observer.sync().error);
 		assertEquals(5, observer.results.size());
+
+	}
+
+	@Test
+	public void testIndexQuery2() throws Exception {
+
+		final Table<String, Integer, String> table = Table.builder(TABLE.name())
+				.rowKey(String.class)
+				.columnKey(Integer.class)
+				.defaultType(String.class)
+				.column(1234, String.class, true)
+				.column(1111, Integer.class, true)
+				.build();
+
+		store.create(KEYSPACE, table);
+
+		Thread.sleep(100);
+
+		final Batch batch = store.batch(KEYSPACE);
+		for (int i = 1; i < 1000; i++) {
+			batch.row(table, "test-" + i).set(1234, "value-" + (i % 100))
+					.set(1111, i);
+		}
+		batch.commit();
+
+		Thread.sleep(1000);
+
+		final TestObserver<StoreRow<String, Integer>> obs = TestObserver.create();
+
+		store.query(KEYSPACE, table).where(1234, "value-50").build().subscribe(obs);
+
+		assertEquals(null, obs.sync().error);
+		assertEquals(10, obs.results.size());
+
+		store.query(KEYSPACE, table).where(1234, "value-50")
+				.where(1111, 50).build().subscribe(obs.reset());
+
+		assertEquals(null, obs.sync().error);
+		assertEquals(1, obs.results.size());
+
+		store.query(KEYSPACE, table).where(1234, "value-50")
+				.where(1111, 500, Operator.LT).build()
+				.subscribe(obs.reset());
+
+		assertEquals(null, obs.sync().error);
+		assertEquals(5, obs.results.size());
 
 	}
 

@@ -8,7 +8,6 @@ import rx.Observer;
 import rx.Subscription;
 
 import com.barchart.store.api.Batch;
-import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.StoreRow;
@@ -61,19 +60,17 @@ public class HeapStore implements StoreService {
 		getDatabase(database).update(table);
 	}
 
-	@Override
-	public <R extends Comparable<R>> void create(final String database,
-			final Table<R, String, String> table, final ColumnDef... columns)
-			throws Exception {
-		getDatabase(database).create(table, columns);
-	}
-
-	@Override
-	public <R extends Comparable<R>> void update(final String database,
-			final Table<R, String, String> table, final ColumnDef... columns)
-			throws Exception {
-		getDatabase(database).update(table, columns);
-	}
+	/*
+	 * @Override public <R extends Comparable<R>> void create(final String
+	 * database, final Table<R, String, String> table, final ColumnDef...
+	 * columns) throws Exception { getDatabase(database).create(table, columns);
+	 * }
+	 * 
+	 * @Override public <R extends Comparable<R>> void update(final String
+	 * database, final Table<R, String, String> table, final ColumnDef...
+	 * columns) throws Exception { getDatabase(database).update(table, columns);
+	 * }
+	 */
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void truncate(final String database,

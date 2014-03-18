@@ -17,10 +17,10 @@ public class Table<R extends Comparable<R>, C extends Comparable<C>, V> {
 	protected final Class<C> columnType;
 	protected final Class<V> defaultValueType;
 
-	protected final List<Column<?>> columns = new ArrayList<Column<?>>();
+	protected final List<Column<C>> columns = new ArrayList<Column<C>>();
 
 	protected Table(final String name_, final Class<R> rowType_, final Class<C> columnType_,
-			final Class<V> defaultValueType_, final List<Column<?>> columns_) {
+			final Class<V> defaultValueType_, final List<Column<C>> columns_) {
 
 		name = name_;
 
@@ -49,7 +49,7 @@ public class Table<R extends Comparable<R>, C extends Comparable<C>, V> {
 		return defaultValueType;
 	}
 
-	public List<Column<?>> columns() {
+	public List<Column<C>> columns() {
 		return Collections.unmodifiableList(columns);
 	}
 
@@ -63,9 +63,10 @@ public class Table<R extends Comparable<R>, C extends Comparable<C>, V> {
 
 	/**
 	 * Create a new table definition with the specified key and value types.
-	 *
-	 * @Deprecated Use builder() instead
+	 * 
+	 * @deprecated Use builder() instead
 	 */
+	@Deprecated
 	public static <R extends Comparable<R>, C extends Comparable<C>, V> Table<R, C, V> make(final String name_,
 			final Class<R> rowType_, final Class<C> columnType_, final Class<V> valueType_) {
 		return new Table<R, C, V>(name_, rowType_, columnType_, valueType_, null);
@@ -74,9 +75,10 @@ public class Table<R extends Comparable<R>, C extends Comparable<C>, V> {
 	/**
 	 * Create a new table definition with the specified column key type, String
 	 * row keys and String column values.
-	 *
-	 * @Deprecated Use builder() instead
+	 * 
+	 * @deprecated Use builder() instead
 	 */
+	@Deprecated
 	public static <C extends Comparable<C>> Table<String, C, String> make(final String name_,
 			final Class<C> columnType_) {
 		return new Table<String, C, String>(name_, String.class, columnType_, String.class, null);
@@ -85,9 +87,10 @@ public class Table<R extends Comparable<R>, C extends Comparable<C>, V> {
 	/**
 	 * Create a new table definition with String row keys, column keys and
 	 * values.
-	 *
-	 * @Deprecated Use builder() instead
+	 * 
+	 * @deprecated Use builder() instead
 	 */
+	@Deprecated
 	public static Table<String, String, String> make(final String name_) {
 		return builder(name_).build();
 	}
@@ -99,7 +102,7 @@ public class Table<R extends Comparable<R>, C extends Comparable<C>, V> {
 		public Class<C> columnType = null;
 		public Class<V> defaultValueType = null;
 
-		private final List<Column<?>> columns = new ArrayList<Column<?>>();
+		private final List<Column<C>> columns = new ArrayList<Column<C>>();
 
 		private Builder(final String name_, final Class<R> rowType_, final Class<C> columnType_,
 				final Class<V> defaultValueType_) {
@@ -121,14 +124,8 @@ public class Table<R extends Comparable<R>, C extends Comparable<C>, V> {
 			return new Builder<R, C, T>(name, rowType, columnType, type_);
 		}
 
-		public <T> Builder<R, C, V> index(final T key_, final Class<?> type_) {
-			columns.add(new ColumnImpl<T>(key_, type_, true));
-			return this;
-		}
-
-		public <T> Builder<R, C, V> column(final T key_,
-				final Class<?> type_, final boolean indexed_) {
-			columns.add(new ColumnImpl<T>(key_, type_, indexed_));
+		public Builder<R, C, V> column(final C key_, final Class<?> type_, final boolean indexed_) {
+			columns.add(new ColumnImpl<C>(key_, type_, indexed_));
 			return this;
 		}
 

@@ -7,31 +7,28 @@ import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
+import com.barchart.store.api.Table;
 import com.google.common.collect.MapMaker;
 
 /**
  * Experimental, not for production.
  */
-public class IndexedHeapTable<R extends Comparable<R>, V> extends HeapTable<R, String, V> {
+public class IndexedHeapTable<R extends Comparable<R>, C extends Comparable<C>, V> extends HeapTable<R, C, V> {
 
-	private final Map<String, Map<Object, Collection<HeapRow<R, String>>>> indexes;
+	private final Map<C, Map<Object, Collection<HeapRow<R, C>>>> indexes;
 
-	public IndexedHeapTable(final ColumnDef... columns_) {
+	public IndexedHeapTable(final Table<R, C, V> table_) {
 
-		super(columns_);
+		super(table_);
 
-		indexes =
-				new ConcurrentHashMap<String, Map<Object, Collection<HeapRow<R, String>>>>();
+		indexes = new ConcurrentHashMap<C, Map<Object, Collection<HeapRow<R, C>>>>();
 
-		if (columns_ != null && columns_.length > 0) {
-			for (final ColumnDef def : columns_) {
+		if (table.columns().size() > 0) {
+			for (final Table.Column<C> def : table.columns()) {
 				columns.put(def.key(), def);
 				if (def.isIndexed()) {
-					indexes.put(
-							def.key(),
-							new ConcurrentHashMap<Object, Collection<HeapRow<R, String>>>());
+					indexes.put(def.key(), new ConcurrentHashMap<Object, Collection<HeapRow<R, C>>>());
 				}
 			}
 		}
@@ -39,18 +36,18 @@ public class IndexedHeapTable<R extends Comparable<R>, V> extends HeapTable<R, S
 	}
 
 	@Override
-	public ObservableIndexQueryBuilder<R, String> query() throws Exception {
-		return new HeapIndexQueryBuilder<R, String>(indexes);
+	public ObservableIndexQueryBuilder<R, C> query() throws Exception {
+		return new HeapIndexQueryBuilder<R, C>(indexes);
 	}
 
 	@Override
-	protected HeapRow<R, String> remove(final R key) {
+	protected HeapRow<R, C> remove(final R key) {
 		return deindex(super.remove(key));
 	}
 
 	@Override
-	protected HeapRow<R, String> put(final R key, final HeapRow<R, String> row) {
-		final HeapRow<R, String> old = super.put(key, row);
+	protected HeapRow<R, C> put(final R key, final HeapRow<R, C> row) {
+		final HeapRow<R, C> old = super.put(key, row);
 		if (old != row && old != null) {
 			deindex(old);
 		}
@@ -58,9 +55,9 @@ public class IndexedHeapTable<R extends Comparable<R>, V> extends HeapTable<R, S
 		return old;
 	}
 
-	private HeapRow<R, String> index(final HeapRow<R, String> row) {
+	private HeapRow<R, C> index(final HeapRow<R, C> row) {
 		if (row != null) {
-			for (final Map.Entry<String, Map<Object, Collection<HeapRow<R, String>>>> idx : indexes
+			for (final Map.Entry<C, Map<Object, Collection<HeapRow<R, C>>>> idx : indexes
 					.entrySet()) {
 				if (row.columns().contains(idx.getKey())) {
 					update(row, row.getImpl(idx.getKey()));
@@ -70,9 +67,9 @@ public class IndexedHeapTable<R extends Comparable<R>, V> extends HeapTable<R, S
 		return row;
 	}
 
-	private HeapRow<R, String> deindex(final HeapRow<R, String> row) {
+	private HeapRow<R, C> deindex(final HeapRow<R, C> row) {
 		if (row != null) {
-			for (final String name : row.columns()) {
+			for (final C name : row.columns()) {
 				if (row.columns().contains(name)) {
 					remove(row, row.getImpl(name));
 				}
@@ -81,22 +78,20 @@ public class IndexedHeapTable<R extends Comparable<R>, V> extends HeapTable<R, S
 		return row;
 	}
 
-	protected void update(final HeapRow<R, String> row,
-			final HeapColumn<String> column) {
+	protected void update(final HeapRow<R, C> row, final HeapColumn<C> column) {
 
 		if (column == null) {
 			return;
 		}
 
-		final ColumnDef def = columns.get(column.getName());
+		final Table.Column<C> def = columns.get(column.getName());
 
-		final Map<Object, Collection<HeapRow<R, String>>> idx =
-				indexes.get(column.getName());
+		final Map<Object, Collection<HeapRow<R, C>>> idx = indexes.get(column.getName());
 
 		try {
 
 			// Remove old value / de-index
-			final HeapColumn<String> old = row.getImpl(column.getName());
+			final HeapColumn<C> old = row.getImpl(column.getName());
 			if (old != null && old != column) {
 				remove(row, old);
 			}
@@ -128,17 +123,15 @@ public class IndexedHeapTable<R extends Comparable<R>, V> extends HeapTable<R, S
 
 	}
 
-	protected void remove(final HeapRow<R, String> row,
-			final HeapColumn<String> column) {
+	protected void remove(final HeapRow<R, C> row, final HeapColumn<C> column) {
 
 		if (column == null) {
 			return;
 		}
 
-		final ColumnDef def = columns.get(column.getName());
+		final Table.Column<C> def = columns.get(column.getName());
 
-		final Map<Object, Collection<HeapRow<R, String>>> idx =
-				indexes.get(column.getName());
+		final Map<Object, Collection<HeapRow<R, C>>> idx = indexes.get(column.getName());
 
 		try {
 
@@ -168,20 +161,19 @@ public class IndexedHeapTable<R extends Comparable<R>, V> extends HeapTable<R, S
 	}
 
 	private <T> void addIndex(
-			final Map<Object, Collection<HeapRow<R, String>>> map, final T value,
-			final HeapRow<R, String> row) {
+			final Map<Object, Collection<HeapRow<R, C>>> map, final T value,
+			final HeapRow<R, C> row) {
 
 		if (value == null) {
 			return;
 		}
 
-		Collection<HeapRow<R, String>> matches = map.get(value);
+		Collection<HeapRow<R, C>> matches = map.get(value);
 
 		if (matches == null) {
 
 			// Weak references to throw out deleted rows
-			final Map<HeapRow<R, String>, Boolean> backingMap =
-					new MapMaker().weakValues().makeMap();
+			final Map<HeapRow<R, C>, Boolean> backingMap = new MapMaker().weakValues().makeMap();
 
 			matches = Collections.newSetFromMap(backingMap);
 
@@ -193,15 +185,14 @@ public class IndexedHeapTable<R extends Comparable<R>, V> extends HeapTable<R, S
 
 	}
 
-	private <T> void removeIndex(
-			final Map<Object, Collection<HeapRow<R, String>>> map, final T value,
-			final HeapRow<R, String> row) {
+	private void removeIndex(final Map<Object, Collection<HeapRow<R, C>>> map, final Object value,
+			final HeapRow<R, C> row) {
 
 		if (value == null) {
 			return;
 		}
 
-		final Collection<HeapRow<R, String>> matches = map.get(value);
+		final Collection<HeapRow<R, C>> matches = map.get(value);
 
 		if (matches != null) {
 			matches.remove(row);

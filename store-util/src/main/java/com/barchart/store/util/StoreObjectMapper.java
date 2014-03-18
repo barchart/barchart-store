@@ -78,7 +78,7 @@ public abstract class StoreObjectMapper {
 
 		try {
 			return store.fetch(database, table, keys).build()
-					.filter(new EmptyRowFilter<R, C>()).map(mapper(mapper));
+					.filter(Filters.EMPTY_ROW).map(mapper(mapper));
 		} catch (final Exception e) {
 			return Observable.error(e);
 		}
@@ -106,8 +106,7 @@ public abstract class StoreObjectMapper {
 				query.columns(columns);
 			}
 
-			return query.build().filter(new EmptyRowFilter<R, C>())
-					.map(mapper(mapper)).mapMany(new ListExploder<T>());
+			return query.build().filter(Filters.EMPTY_ROW).map(mapper(mapper)).mapMany(Functions.<T> each());
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -131,8 +130,7 @@ public abstract class StoreObjectMapper {
 		try {
 
 			return store.fetch(database, table, key).prefix(prefix).build()
-					.filter(new EmptyRowFilter<R, String>()).map(mapper(mapper))
-					.mapMany(new ListExploder<T>());
+					.filter(Filters.EMPTY_ROW).map(mapper(mapper)).mapMany(Functions.<T> each());
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -164,8 +162,7 @@ public abstract class StoreObjectMapper {
 				query.first(count);
 			}
 
-			return query.build().filter(new EmptyRowFilter<R, C>())
-					.map(mapper(mapper)).mapMany(new ListExploder<T>());
+			return query.build().filter(Filters.EMPTY_ROW).map(mapper(mapper)).mapMany(Functions.<T> each());
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -190,9 +187,8 @@ public abstract class StoreObjectMapper {
 
 		try {
 
-			return store.fetch(database, table, key).start(start).end(end)
-					.build().filter(new EmptyRowFilter<R, C>())
-					.map(mapper(mapper)).mapMany(new ListExploder<T>());
+			return store.fetch(database, table, key).start(start).end(end).build()
+					.filter(Filters.EMPTY_ROW).map(mapper(mapper)).mapMany(Functions.<T> each());
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -222,8 +218,7 @@ public abstract class StoreObjectMapper {
 				builder.where(where.field, where.value, where.operator);
 			}
 
-			return builder.build().filter(new EmptyRowFilter<R, C>())
-					.map(mapper(mapper));
+			return builder.build().filter(Filters.EMPTY_ROW).map(mapper(mapper));
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -421,19 +416,6 @@ public abstract class StoreObjectMapper {
 		}
 
 		return strings;
-
-	}
-
-	protected static class ListExploder<T> implements
-			Func1<List<T>, Observable<T>> {
-
-		public ListExploder() {
-		}
-
-		@Override
-		public Observable<T> call(final List<T> t1) {
-			return Observable.from(t1);
-		}
 
 	}
 

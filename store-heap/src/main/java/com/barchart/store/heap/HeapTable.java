@@ -7,18 +7,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
+import com.barchart.store.api.Table;
 
 public class HeapTable<R extends Comparable<R>, C extends Comparable<C>, V> {
 
 	protected final Map<R, HeapRow<R, C>> rows;
-	protected final Map<C, ColumnDef> columns;
+	protected final Table<R, C, V> table;
+	protected final Map<C, Table.Column<C>> columns;
 
-	public HeapTable(final ColumnDef... columns_) {
+	public HeapTable(final Table<R, C, V> table_) {
 		rows = new ConcurrentHashMap<R, HeapRow<R, C>>();
-		columns = new HashMap<C, ColumnDef>();
+		table = table_;
+		columns = new HashMap<C, Table.Column<C>>();
 	}
 
 	protected HeapRowMutator<R, C> mutator(final R key) {

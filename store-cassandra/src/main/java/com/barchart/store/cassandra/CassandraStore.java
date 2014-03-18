@@ -14,12 +14,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import rx.Observable;
 import rx.Observer;
 import rx.Subscription;
 
 import com.barchart.store.api.Batch;
-import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableIndexQueryBuilder.Operator;
 import com.barchart.store.api.ObservableQueryBuilder;
@@ -72,6 +74,8 @@ import com.netflix.astyanax.thrift.ThriftFamilyFactory;
 import com.netflix.astyanax.util.RangeBuilder;
 
 public class CassandraStore implements StoreService {
+
+	private final Logger log = LoggerFactory.getLogger(getClass());
 
 	private String[] seeds = new String[] {
 			"eqx02.chicago.b.cassandra.eqx.barchart.com",
@@ -236,7 +240,7 @@ public class CassandraStore implements StoreService {
 	public <R extends Comparable<R>, C extends Comparable<C>, V> boolean has(final String keyspace,
 			final Table<R, C, V> table) throws ConnectionException {
 		return clusterContext.getClient().getKeyspace(keyspace)
-				.describeKeyspace().getColumnFamily(table.name) != null;
+				.describeKeyspace().getColumnFamily(table.name()) != null;
 	}
 
 	@Override
@@ -246,24 +250,20 @@ public class CassandraStore implements StoreService {
 				.getClient()
 				.getKeyspace(keyspace)
 				.createColumnFamily(
-						new ColumnFamily<R, C>(table.name,
-								serializerFor(table.rowType), // Row key
-								serializerFor(table.columnType)), // Column key
+						new ColumnFamily<R, C>(table.name(),
+								serializerFor(table.rowType()),
+								serializerFor(table.columnType())),
 						getCFOptions(table));
 	}
 
-	@Override
-	public <R extends Comparable<R>> void create(final String keyspace, final Table<R, String, String> table,
-			final ColumnDef... columns) throws ConnectionException {
-		clusterContext
-				.getClient()
-				.getKeyspace(keyspace)
-				.createColumnFamily(
-						new ColumnFamily<R, String>(table.name,
-								serializerFor(table.rowType), // Row key
-								StringSerializer.get()), // Column key
-						getCFOptions(table, columns));
-	}
+	/*
+	 * @Override public <R extends Comparable<R>> void create(final String
+	 * keyspace, final Table<R, String, String> table, final ColumnDef...
+	 * columns) throws ConnectionException { clusterContext .getClient()
+	 * .getKeyspace(keyspace) .createColumnFamily( new ColumnFamily<R,
+	 * String>(table.name, serializerFor(table.rowType), // Row key
+	 * StringSerializer.get()), // Column key getCFOptions(table, columns)); }
+	 */
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void update(final String keyspace,
@@ -272,37 +272,33 @@ public class CassandraStore implements StoreService {
 				.getClient()
 				.getKeyspace(keyspace)
 				.updateColumnFamily(
-						new ColumnFamily<R, C>(table.name,
-								serializerFor(table.rowType), // Row key
-								serializerFor(table.columnType)), // Column key
+						new ColumnFamily<R, C>(table.name(),
+								serializerFor(table.rowType()),
+								serializerFor(table.columnType())),
 						getCFOptions(table));
 	}
 
-	@Override
-	public <R extends Comparable<R>> void update(final String keyspace,
-			final Table<R, String, String> table, final ColumnDef... columns)
-			throws Exception {
-		clusterContext
-				.getClient()
-				.getKeyspace(keyspace)
-				.updateColumnFamily(
-						new ColumnFamily<R, String>(table.name,
-								serializerFor(table.rowType), // Row key
-								StringSerializer.get()),// Column serializer
-						getCFOptions(table, columns));
-	}
+	/*
+	 * @Override public <R extends Comparable<R>> void update(final String
+	 * keyspace, final Table<R, String, String> table, final ColumnDef...
+	 * columns) throws Exception { clusterContext .getClient()
+	 * .getKeyspace(keyspace) .updateColumnFamily( new ColumnFamily<R,
+	 * String>(table.name, serializerFor(table.rowType), // Row key
+	 * StringSerializer.get()),// Column serializer getCFOptions(table,
+	 * columns)); }
+	 */
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void truncate(final String keyspace,
 			final Table<R, C, V> table) throws ConnectionException {
-		clusterContext.getClient().getKeyspace(keyspace).truncateColumnFamily(table.name);
+		clusterContext.getClient().getKeyspace(keyspace).truncateColumnFamily(table.name());
 	}
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void delete(final String keyspace,
 			final Table<R, C, V> table) throws ConnectionException {
 		clusterContext.getClient().getKeyspace(keyspace)
-				.dropColumnFamily(table.name);
+				.dropColumnFamily(table.name());
 	}
 
 	@SuppressWarnings("unchecked")
@@ -359,11 +355,11 @@ public class CassandraStore implements StoreService {
 	}
 
 	private <R extends Comparable<R>, C extends Comparable<C>, V> Map<String, Object> getCFOptions(
-			final Table<R, C, V> table, final ColumnDef... columns) {
+			final Table<R, C, V> table) {
 
-		final String rowValidator = validatorFor(table.rowType);
-		final String columnValidator = validatorFor(table.columnType);
-		final String valueValidator = validatorFor(table.defaultValueType);
+		final String rowValidator = validatorFor(table.rowType());
+		final String columnValidator = validatorFor(table.columnType());
+		final String valueValidator = validatorFor(table.defaultValueType());
 
 		final ImmutableMap.Builder<String, Object> builder =
 				ImmutableMap.<String, Object> builder()
@@ -371,24 +367,35 @@ public class CassandraStore implements StoreService {
 						.put("comparator_type", columnValidator)
 						.put("default_validation_class", valueValidator);
 
-		if (columns != null && columns.length > 0) {
+		if (table.columns().size() > 0) {
 
 			final Map<String, Object> cols = new HashMap<String, Object>();
 
-			for (final ColumnDef column : columns) {
+			for (final Table.Column<C> column : table.columns()) {
 
-				final Map<String, String> props = new HashMap<String, String>();
-				props.put("validation_class", validatorFor(column.type()));
+				if (column.key() instanceof String) {
 
-				if (column.isIndexed()) {
-					props.put("index_name",
-							safeIndexName(table.name, column.key()));
-					props.put("index_type", "KEYS");
+					final String columnName = (String) column.key();
+
+					final Map<String, String> props = new HashMap<String, String>();
+					props.put("validation_class", validatorFor(column.type()));
+
+					if (column.isIndexed()) {
+						props.put("index_name", safeIndexName(table.name(), columnName));
+						props.put("index_type", "KEYS");
+					}
+
+					cols.put(columnName, props);
+
+				} else {
+
+					throw new IllegalArgumentException("Attempted to define an explicit column "
+							+ "with a non-String key (not currently supported by Astyanax).");
+
 				}
 
-				cols.put(column.key(), props);
-
 			}
+
 
 			builder.put("column_metadata", cols);
 
@@ -578,8 +585,8 @@ public class CassandraStore implements StoreService {
 		@Override
 		public <R extends Comparable<R>, C extends Comparable<C>, V> RowMutator<C> row(final Table<R, C, V> table,
 				final R key) throws Exception {
-			return new CassandraRowMutator<C>(m.withRow(new ColumnFamily<R, C>(table.name,
-					serializerFor(table.rowType), serializerFor(table.columnType)), key));
+			return new CassandraRowMutator<C>(m.withRow(new ColumnFamily<R, C>(table.name(),
+					serializerFor(table.rowType()), serializerFor(table.columnType())), key));
 		}
 
 		@Override
@@ -727,9 +734,9 @@ public class CassandraStore implements StoreService {
 
 			query =
 					keyspace.prepareQuery(
-							new ColumnFamily<R, C>(table_.name,
-									serializerFor(table_.rowType),
-									serializerFor(table_.columnType)))
+							new ColumnFamily<R, C>(table_.name(),
+									serializerFor(table_.rowType()),
+									serializerFor(table_.columnType())))
 							.setConsistencyLevel(level_);
 
 			executor = executor_;

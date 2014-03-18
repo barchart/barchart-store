@@ -26,8 +26,7 @@ public class HeapIndexQueryBuilder<R extends Comparable<R>, C extends Comparable
 	final Map<C, Map<Object, Collection<HeapRow<R, C>>>> indexes;
 	final List<FieldCompare> filters;
 
-	public HeapIndexQueryBuilder(
-			final Map<C, Map<Object, Collection<HeapRow<R, C>>>> indexes_) {
+	public HeapIndexQueryBuilder(final Map<C, Map<Object, Collection<HeapRow<R, C>>>> indexes_) {
 		indexes = indexes_;
 		filters = new ArrayList<FieldCompare>();
 		if (indexes == null) {
