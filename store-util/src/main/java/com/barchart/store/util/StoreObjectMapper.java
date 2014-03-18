@@ -13,7 +13,7 @@ import com.barchart.store.api.ObservableIndexQueryBuilder.Operator;
 import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreService;
-import com.barchart.store.api.StoreService.Table;
+import com.barchart.store.api.Table;
 
 public abstract class StoreObjectMapper {
 
@@ -55,7 +55,8 @@ public abstract class StoreObjectMapper {
 		return database;
 	}
 
-	protected <K, T, M extends RowMapper<K, T>> M mapper(final Class<M> cls) {
+	protected <R extends Comparable<R>, C extends Comparable<C>, T, M extends RowMapper<R, C, T>> M mapper(
+			final Class<M> cls) {
 		return mappers.instance(cls);
 	}
 
@@ -71,13 +72,13 @@ public abstract class StoreObjectMapper {
 	 * @param keys The row keys to load
 	 * @return A lazy observable that executes on every subscribe
 	 */
-	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> loadRows(
-			final Table<K, V> table, final Class<M> mapper,
-			final String... keys) {
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, T>> Observable<T> loadRows(
+			final Table<R, C, V> table, final Class<M> mapper,
+			final R... keys) {
 
 		try {
 			return store.fetch(database, table, keys).build()
-					.filter(new EmptyRowFilter<K>()).map(mapper(mapper));
+					.filter(new EmptyRowFilter<R, C>()).map(mapper(mapper));
 		} catch (final Exception e) {
 			return Observable.error(e);
 		}
@@ -93,20 +94,19 @@ public abstract class StoreObjectMapper {
 	 * @param columns The column names to load
 	 * @return A lazy observable that executes on every subscribe
 	 */
-	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> loadColumns(
-			final Table<K, V> table, final Class<M> mapper, final String key,
-			final K... columns) {
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, List<T>>> Observable<T> loadColumns(
+			final Table<R, C, V> table, final Class<M> mapper, final R key, final C... columns) {
 
 		try {
 
-			final ObservableQueryBuilder<K> query =
-					store.fetch(database, table, key);
+			@SuppressWarnings("unchecked")
+			final ObservableQueryBuilder<R, C> query = store.fetch(database, table, key);
 
 			if (columns != null && columns.length > 0) {
 				query.columns(columns);
 			}
 
-			return query.build().filter(new EmptyRowFilter<K>())
+			return query.build().filter(new EmptyRowFilter<R, C>())
 					.map(mapper(mapper)).mapMany(new ListExploder<T>());
 
 		} catch (final Exception e) {
@@ -124,14 +124,14 @@ public abstract class StoreObjectMapper {
 	 * @param prefix The column name prefix to filter by
 	 * @return A lazy observable that executes on every subscribe
 	 */
-	protected <V, T, M extends RowMapper<String, List<T>>> Observable<T> loadColumnsByPrefix(
-			final Table<String, V> table, final Class<M> mapper,
-			final String key, final String prefix) {
+	@SuppressWarnings("unchecked")
+	protected <R extends Comparable<R>, V, T, M extends RowMapper<R, String, List<T>>> Observable<T> loadColumnsByPrefix(
+			final Table<R, String, V> table, final Class<M> mapper, final R key, final String prefix) {
 
 		try {
 
 			return store.fetch(database, table, key).prefix(prefix).build()
-					.filter(new EmptyRowFilter<String>()).map(mapper(mapper))
+					.filter(new EmptyRowFilter<R, String>()).map(mapper(mapper))
 					.mapMany(new ListExploder<T>());
 
 		} catch (final Exception e) {
@@ -150,14 +150,13 @@ public abstract class StoreObjectMapper {
 	 * @param reverse Sort descending instead of ascending
 	 * @return A lazy observable that executes on every subscribe
 	 */
-	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> loadColumns(
-			final Table<K, V> table, final Class<M> mapper, final String key,
-			final int count, final boolean reverse) {
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, List<T>>> Observable<T> loadColumns(
+			final Table<R, C, V> table, final Class<M> mapper, final R key, final int count, final boolean reverse) {
 
 		try {
 
-			final ObservableQueryBuilder<K> query =
-					store.fetch(database, table, key);
+			@SuppressWarnings("unchecked")
+			final ObservableQueryBuilder<R, C> query = store.fetch(database, table, key);
 
 			if (reverse) {
 				query.last(count);
@@ -165,7 +164,7 @@ public abstract class StoreObjectMapper {
 				query.first(count);
 			}
 
-			return query.build().filter(new EmptyRowFilter<K>())
+			return query.build().filter(new EmptyRowFilter<R, C>())
 					.map(mapper(mapper)).mapMany(new ListExploder<T>());
 
 		} catch (final Exception e) {
@@ -185,14 +184,14 @@ public abstract class StoreObjectMapper {
 	 * @param end The column name to end the range with
 	 * @return A lazy observable that executes on every subscribe
 	 */
-	protected <K, V, T, M extends RowMapper<K, List<T>>> Observable<T> loadColumns(
-			final Table<K, V> table, final Class<M> mapper, final String key,
-			final K start, final K end) {
+	@SuppressWarnings("unchecked")
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, List<T>>> Observable<T> loadColumns(
+			final Table<R, C, V> table, final Class<M> mapper, final R key, final C start, final C end) {
 
 		try {
 
 			return store.fetch(database, table, key).start(start).end(end)
-					.build().filter(new EmptyRowFilter<K>())
+					.build().filter(new EmptyRowFilter<R, C>())
 					.map(mapper(mapper)).mapMany(new ListExploder<T>());
 
 		} catch (final Exception e) {
@@ -210,20 +209,20 @@ public abstract class StoreObjectMapper {
 	 * @return A lazy observable that executes on every subscribe
 	 */
 	@SafeVarargs
-	protected <K, V, T, M extends RowMapper<K, T>> Observable<T> findRows(
-			final Table<K, V> table, final Class<M> mapper,
-			final Where<K>... clauses) {
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, T>> Observable<T> findRows(
+			final Table<R, C, V> table, final Class<M> mapper,
+			final Where<C>... clauses) {
 
 		try {
 
-			final ObservableIndexQueryBuilder<K> builder =
+			final ObservableIndexQueryBuilder<R, C> builder =
 					store.query(database, table);
 
-			for (final Where<K> where : clauses) {
+			for (final Where<C> where : clauses) {
 				builder.where(where.field, where.value, where.operator);
 			}
 
-			return builder.build().filter(new EmptyRowFilter<K>())
+			return builder.build().filter(new EmptyRowFilter<R, C>())
 					.map(mapper(mapper));
 
 		} catch (final Exception e) {
@@ -241,9 +240,9 @@ public abstract class StoreObjectMapper {
 	 * @param obj The object to store
 	 * @return A cached observable that is executed immediately
 	 */
-	protected <K, V, T, U extends T, M extends RowMapper<K, T>> Observable<T> createRow(
-			final Table<K, V> table, final Class<M> mapper, final String key,
-			final U obj) {
+	@SuppressWarnings("unchecked")
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, U extends T, M extends RowMapper<R, C, T>> Observable<T> createRow(
+			final Table<R, C, V> table, final Class<M> mapper, final R key, final U obj) {
 
 		return cache(loadRows(table, mapper, key).isEmpty().mapMany(
 				new Func1<Boolean, Observable<T>>() {
@@ -271,14 +270,13 @@ public abstract class StoreObjectMapper {
 	 * @param obj The object to store
 	 * @return A cached observable that is executed immediately
 	 */
-	protected <K, V, T, U extends T, M extends RowMapper<K, T>> Observable<T> updateRow(
-			final Table<K, V> table, final Class<M> mapper, final String key,
-			final U obj) {
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, U extends T, M extends RowMapper<R, C, T>> Observable<T> updateRow(
+			final Table<R, C, V> table, final Class<M> mapper, final R key, final U obj) {
 
 		try {
 
 			final Batch batch = store.batch(database);
-			final RowMutator<K> mutator = batch.row(table, key);
+			final RowMutator<C> mutator = batch.row(table, key);
 
 			mapper(mapper).encode(obj, mutator);
 			batch.commit();
@@ -300,14 +298,13 @@ public abstract class StoreObjectMapper {
 	 * @param objects The objects to store as columns
 	 * @return A cached observable that is executed immediately
 	 */
-	protected <K, V, T, U extends T, M extends RowMapper<K, List<T>>> Observable<T> updateColumns(
-			final Table<K, V> table, final Class<M> mapper, final String key,
-			final U... objects) {
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, U extends T, M extends RowMapper<R, C, List<T>>> Observable<T> updateColumns(
+			final Table<R, C, V> table, final Class<M> mapper, final R key, final U... objects) {
 
 		try {
 
 			final Batch batch = store.batch(database);
-			final RowMutator<K> mutator = batch.row(table, key);
+			final RowMutator<C> mutator = batch.row(table, key);
 			mapper(mapper).encode(Arrays.asList((T[]) objects), mutator);
 			batch.commit();
 
@@ -326,13 +323,13 @@ public abstract class StoreObjectMapper {
 	 * @param keys The row keys to delete
 	 * @return A cached observable that is executed immediately
 	 */
-	protected <K, V> Observable<String> deleteRows(final Table<K, V> table,
-			final String... keys) {
+	protected <R extends Comparable<R>, C extends Comparable<C>, V> Observable<R> deleteRows(
+			final Table<R, C, V> table, final R... keys) {
 
 		try {
 
 			final Batch batch = store.batch(database);
-			for (final String key : keys) {
+			for (final R key : keys) {
 				batch.row(table, key).delete();
 			}
 			batch.commit();
@@ -353,15 +350,15 @@ public abstract class StoreObjectMapper {
 	 * @param columns The column names to delete
 	 * @return A cached observable that is executed immediately
 	 */
-	protected <K, V> Observable<K> deleteColumns(final Table<K, V> table,
-			final String key, final K... columns) {
+	protected <R extends Comparable<R>, C extends Comparable<C>, V> Observable<C> deleteColumns(
+			final Table<R, C, V> table, final R key, final C... columns) {
 
 		try {
 
 			final Batch batch = store.batch(database);
-			final RowMutator<K> row = batch.row(table, key);
+			final RowMutator<C> row = batch.row(table, key);
 
-			for (final K column : columns) {
+			for (final C column : columns) {
 				row.remove(column);
 			}
 

@@ -6,16 +6,16 @@ import java.util.Set;
 
 import com.barchart.store.api.RowMutator;
 
-public class HeapRowMutator<K> implements RowMutator<K> {
+public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> implements RowMutator<K> {
 
-	protected final HeapTable<K, ?> table;
-	protected final String key;
+	protected final HeapTable<R, K, ?> table;
+	protected final R key;
 	protected final Set<HeapColumn<K>> update;
 	protected final Set<K> remove;
 
 	private boolean delete = false;
 
-	public HeapRowMutator(final HeapTable<K, ?> table_, final String key_) {
+	public HeapRowMutator(final HeapTable<R, K, ?> table_, final R key_) {
 		table = table_;
 		key = key_;
 		update = new HashSet<HeapColumn<K>>();
@@ -80,10 +80,10 @@ public class HeapRowMutator<K> implements RowMutator<K> {
 
 		} else {
 
-			HeapRow<K> row = table.get(key);
+			HeapRow<R, K> row = table.get(key);
 
 			if (row == null) {
-				row = new HeapRow<K>(key);
+				row = new HeapRow<R, K>(key);
 			}
 
 			// Apply inserts/updates

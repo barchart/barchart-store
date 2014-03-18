@@ -1,7 +1,7 @@
 package com.barchart.store.api;
 
-public interface ObservableIndexQueryBuilder<T> extends
-		ObservableQueryBuilder<T> {
+public interface ObservableIndexQueryBuilder<R extends Comparable<R>, C extends Comparable<C>> extends
+		ObservableQueryBuilder<R, C> {
 
 	public enum Operator {
 
@@ -35,12 +35,12 @@ public interface ObservableIndexQueryBuilder<T> extends
 	/**
 	 * Filter rows based on column value (using Operator.EQUAL).
 	 */
-	ObservableIndexQueryBuilder<T> where(T column, Object value);
+	ObservableIndexQueryBuilder<R, C> where(C column, Object value);
 
 	/**
 	 * Filter rows based on column value using the specified comparison
 	 * operator.
 	 */
-	ObservableIndexQueryBuilder<T> where(T column, Object value, Operator op);
+	ObservableIndexQueryBuilder<R, C> where(C column, Object value, Operator op);
 
 }

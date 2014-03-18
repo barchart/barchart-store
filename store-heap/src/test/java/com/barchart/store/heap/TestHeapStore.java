@@ -13,16 +13,16 @@ import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.ObservableIndexQueryBuilder.Operator;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreRow;
-import com.barchart.store.api.StoreService.Table;
+import com.barchart.store.api.Table;
 import com.barchart.util.test.concurrent.TestObserver;
 
 public class TestHeapStore {
 
 	private static final String KEYSPACE = "cs_unit_test";
-	private static final Table<String, String> TABLE = Table
+	private static final Table<String, String, String> TABLE = Table
 			.make("cs_test_table");
 
-	private TestObserver<StoreRow<String>> observer;
+	private TestObserver<StoreRow<String, String>> observer;
 	private HeapStore store;
 
 	@Test
@@ -147,7 +147,7 @@ public class TestHeapStore {
 		store.fetch(KEYSPACE, TABLE, "test-1").first(1).build()
 				.subscribe(observer);
 
-		StoreRow<String> row = observer.sync().results.get(0);
+		StoreRow<String, String> row = observer.sync().results.get(0);
 		assertEquals(1, row.columns().size());
 		assertEquals("field1", row.columns().iterator().next());
 		assertEquals("value1", row.get("field1").getString());
@@ -180,7 +180,7 @@ public class TestHeapStore {
 		store.fetch(KEYSPACE, TABLE, "test-1").start("field10").end("field15")
 				.build().subscribe(observer);
 
-		StoreRow<String> row = observer.sync().results.get(0);
+		StoreRow<String, String> row = observer.sync().results.get(0);
 		assertEquals(6, row.columns().size());
 
 		// Test indexed sort order
@@ -225,6 +225,30 @@ public class TestHeapStore {
 
 		assertEquals(null, observer.sync().error);
 		assertEquals(4, observer.results.size());
+
+	}
+
+	@Test
+	public void testTruncate() throws Exception {
+
+		store.create(KEYSPACE, TABLE);
+		Thread.sleep(100);
+
+		final Batch batch = store.batch(KEYSPACE);
+		batch.row(TABLE, "test-1").set("column_key", "column_value1");
+		batch.row(TABLE, "test-2").set("column_key", "column_value2");
+		batch.row(TABLE, "test-3").set("column_key", "column_value3");
+		batch.row(TABLE, "test-4").set("column_key", "column_value4");
+		batch.commit();
+
+		Thread.sleep(100);
+
+		store.truncate(KEYSPACE, TABLE);
+
+		store.fetch(KEYSPACE, TABLE).build().subscribe(observer);
+
+		assertEquals(null, observer.sync().error);
+		assertEquals(0, observer.results.size());
 
 	}
 
@@ -301,7 +325,7 @@ public class TestHeapStore {
 
 	@Before
 	public void setUp() throws Exception {
-		observer = new TestObserver<StoreRow<String>>();
+		observer = new TestObserver<StoreRow<String, String>>();
 		store = new HeapStore();
 		try {
 			store.delete(KEYSPACE);

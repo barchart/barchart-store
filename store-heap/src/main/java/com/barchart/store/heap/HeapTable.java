@@ -11,65 +11,69 @@ import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
 
-public class HeapTable<K, V> {
+public class HeapTable<R extends Comparable<R>, C extends Comparable<C>, V> {
 
-	protected final Map<String, HeapRow<K>> rows;
-	protected final Map<String, ColumnDef> columns;
+	protected final Map<R, HeapRow<R, C>> rows;
+	protected final Map<C, ColumnDef> columns;
 
 	public HeapTable(final ColumnDef... columns_) {
-		rows = new ConcurrentHashMap<String, HeapRow<K>>();
-		columns = new HashMap<String, ColumnDef>();
+		rows = new ConcurrentHashMap<R, HeapRow<R, C>>();
+		columns = new HashMap<C, ColumnDef>();
 	}
 
-	protected HeapRowMutator<K> mutator(final String key) {
-		return new HeapRowMutator<K>(this, key);
+	protected HeapRowMutator<R, C> mutator(final R key) {
+		return new HeapRowMutator<R, C>(this, key);
 	}
 
-	public ObservableQueryBuilder<K> fetch(final String... keys)
+	public ObservableQueryBuilder<R, C> fetch(final R... keys)
 			throws Exception {
 
 		if (keys != null && keys.length > 0) {
 
-			final List<HeapRow<K>> matches = new ArrayList<HeapRow<K>>();
+			final List<HeapRow<R, C>> matches = new ArrayList<HeapRow<R, C>>();
 
-			for (final String key : keys) {
-				final HeapRow<K> row = rows.get(key);
+			for (final R key : keys) {
+				final HeapRow<R, C> row = rows.get(key);
 				if (row != null) {
 					matches.add(row);
 				} else {
 					// Per spec (and Cassandra behavior), we should always
 					// return a row for an explicitly requested key, even if it
 					// is empty
-					matches.add(new HeapRow<K>(key));
+					matches.add(new HeapRow<R, C>(key));
 				}
 			}
 
-			return new HeapQueryBuilder<K>(
+			return new HeapQueryBuilder<R, C>(
 					Collections.unmodifiableCollection(matches));
 
 		} else {
 
-			return new HeapQueryBuilder<K>(
+			return new HeapQueryBuilder<R, C>(
 					Collections.unmodifiableCollection(rows.values()));
 
 		}
 
 	}
 
-	public ObservableIndexQueryBuilder<K> query() throws Exception {
+	public ObservableIndexQueryBuilder<R, C> query() throws Exception {
 		// Unsupported operation, no indexes
-		return new HeapIndexQueryBuilder<K>(null);
+		return new HeapIndexQueryBuilder<R, C>(null);
 	}
 
-	protected HeapRow<K> remove(final String key) {
+	public void truncate() {
+		rows.clear();
+	}
+
+	protected HeapRow<R, C> remove(final R key) {
 		return rows.remove(key);
 	}
 
-	protected HeapRow<K> get(final String key) {
+	protected HeapRow<R, C> get(final R key) {
 		return rows.get(key);
 	}
 
-	protected HeapRow<K> put(final String key, final HeapRow<K> row) {
+	protected HeapRow<R, C> put(final R key, final HeapRow<R, C> row) {
 		return rows.put(key, row);
 	}
 

@@ -8,26 +8,26 @@ import java.util.Collection;
  * @param <T>
  *            The column key data type
  */
-public interface StoreRow<T> extends Comparable<StoreRow<T>> {
+public interface StoreRow<R extends Comparable<R>, C extends Comparable<C>> extends Comparable<StoreRow<R, C>> {
 
 	/**
 	 * The unique row key.
 	 */
-	public String getKey();
+	public R getKey();
 
 	/**
 	 * A list of column keys contained in this row.
 	 */
-	public Collection<T> columns();
+	public Collection<C> columns();
 
 	/**
 	 * Get a column by index.
 	 */
-	public StoreColumn<T> getByIndex(int index);
+	public StoreColumn<C> getByIndex(int index);
 
 	/**
 	 * Get a column by name.
 	 */
-	public StoreColumn<T> get(T name);
+	public StoreColumn<C> get(C name);
 
 }

@@ -3,9 +3,8 @@ package com.barchart.store.util;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.StoreService;
-import com.barchart.store.api.StoreService.Table;
+import com.barchart.store.api.Table;
 
 /**
  * Base class for defining store schemas.
@@ -15,7 +14,7 @@ public abstract class StoreSchema {
 	/**
 	 * Override in subclass to provide table definitions for the update process.
 	 */
-	protected abstract SchemaTable<?, ?>[] tables();
+	protected abstract SchemaTable<?, ?, ?>[] tables();
 
 	@SuppressWarnings("unchecked")
 	public void update(final StoreService store, final String database)
@@ -25,19 +24,19 @@ public abstract class StoreSchema {
 			store.create(database);
 		}
 
-		final SchemaTable<?, ?>[] tables = tables();
+		final SchemaTable<?, ?, ?>[] tables = tables();
 
-		for (final SchemaTable<?, ?> table : tables) {
+		for (final SchemaTable<?, ?, ?> table : tables) {
 			if (!store.has(database, table.table)) {
 				if (table.columns.size() > 0) {
-					store.create(database, (Table<String, String>) table.table,
+					store.create(database, (Table<?, String, String>) table.table,
 							table.columns.toArray(new ColumnDef[] {}));
 				} else {
 					store.create(database, table.table);
 				}
 			} else {
 				if (table.columns.size() > 0) {
-					store.update(database, (Table<String, String>) table.table,
+					store.update(database, (Table<?, String, String>) table.table,
 							table.columns.toArray(new ColumnDef[] {}));
 				} else {
 					store.update(database, table.table);
@@ -49,25 +48,25 @@ public abstract class StoreSchema {
 
 	/**
 	 * Schema table definition.
-	 * 
+	 *
 	 * @param <K> The default column key type.
 	 * @param <V> The default column value type.
 	 */
-	protected static class SchemaTable<K, V> {
+	protected static class SchemaTable<R extends Comparable<R>, C extends Comparable<C>, V> {
 
-		private final Table<K, V> table;
+		private final Table<R, C, V> table;
 		private final List<ColumnDef> columns = new ArrayList<ColumnDef>();
 
-		public SchemaTable(final Table<K, V> table_) {
+		public SchemaTable(final Table<R, C, V> table_) {
 			table = table_;
 		}
 
-		public SchemaTable<K, V> index(final String key_, final Class<?> type_) {
+		public SchemaTable<R, C, V> index(final String key_, final Class<?> type_) {
 			columns.add(new SchemaColumn(key_, type_, true));
 			return this;
 		}
 
-		public SchemaTable<K, V> column(final String key_,
+		public SchemaTable<R, C, V> column(final String key_,
 				final Class<?> type_, final boolean indexed_) {
 			columns.add(new SchemaColumn(key_, type_, indexed_));
 			return this;

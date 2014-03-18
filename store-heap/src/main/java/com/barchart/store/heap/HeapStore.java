@@ -13,6 +13,7 @@ import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.StoreRow;
 import com.barchart.store.api.StoreService;
+import com.barchart.store.api.Table;
 
 public class HeapStore implements StoreService {
 
@@ -41,46 +42,55 @@ public class HeapStore implements StoreService {
 	}
 
 	@Override
-	public <K, V> boolean has(final String database, final Table<K, V> table)
+	public <R extends Comparable<R>, C extends Comparable<C>, V> boolean has(final String database, final Table<R, C, V> table)
 			throws Exception {
 		return getDatabase(database).has(table);
 	}
 
 	@Override
-	public <K, V> void create(final String database, final Table<K, V> table)
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void create(final String database,
+			final Table<R, C, V> table)
 			throws Exception {
 		getDatabase(database).create(table);
 	}
 
 	@Override
-	public void create(final String database,
-			final Table<String, String> table, final ColumnDef... columns)
-			throws Exception {
-		getDatabase(database).create(table, columns);
-	}
-
-	@Override
-	public <K, V> void update(final String database, final Table<K, V> table)
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void update(final String database,
+			final Table<R, C, V> table)
 			throws Exception {
 		getDatabase(database).update(table);
 	}
 
 	@Override
-	public void update(final String database,
-			final Table<String, String> table, final ColumnDef... columns)
+	public <R extends Comparable<R>> void create(final String database,
+			final Table<R, String, String> table, final ColumnDef... columns)
+			throws Exception {
+		getDatabase(database).create(table, columns);
+	}
+
+	@Override
+	public <R extends Comparable<R>> void update(final String database,
+			final Table<R, String, String> table, final ColumnDef... columns)
 			throws Exception {
 		getDatabase(database).update(table, columns);
 	}
 
 	@Override
-	public <K, V> void delete(final String database, final Table<K, V> table)
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void truncate(final String database,
+			final Table<R, C, V> table)
+			throws Exception {
+		getDatabase(database).truncate(table);
+	}
+
+	@Override
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void delete(final String database, final Table<R, C, V> table)
 			throws Exception {
 		getDatabase(database).delete(table);
 	}
 
 	@Override
-	public <K, V> Observable<Boolean> exists(final String database,
-			final Table<K, V> table, final String keys) throws Exception {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> Observable<Boolean> exists(final String database,
+			final Table<R, C, V> table, final R keys) throws Exception {
 
 		return Observable.create(new Observable.OnSubscribeFunc<Boolean>() {
 
@@ -90,9 +100,10 @@ public class HeapStore implements StoreService {
 
 				try {
 
+					@SuppressWarnings("unchecked")
 					final Subscription sub =
 							fetch(database, table, keys).build().subscribe(
-									new Observer<StoreRow<K>>() {
+									new Observer<StoreRow<R, C>>() {
 
 										@Override
 										public void onCompleted() {
@@ -105,7 +116,7 @@ public class HeapStore implements StoreService {
 										}
 
 										@Override
-										public void onNext(final StoreRow<K> row) {
+										public void onNext(final StoreRow<R, C> row) {
 											if (row.columns().size() > 0) {
 												observer.onNext(true);
 											} else {
@@ -141,14 +152,14 @@ public class HeapStore implements StoreService {
 	}
 
 	@Override
-	public <K, V> ObservableQueryBuilder<K> fetch(final String database,
-			final Table<K, V> table, final String... keys) throws Exception {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableQueryBuilder<R, C> fetch(final String database,
+			final Table<R, C, V> table, final R... keys) throws Exception {
 		return getDatabase(database).fetch(table, keys);
 	}
 
 	@Override
-	public <K, V> ObservableIndexQueryBuilder<K> query(final String database,
-			final Table<K, V> table) throws Exception {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableIndexQueryBuilder<R, C> query(final String database,
+			final Table<R, C, V> table) throws Exception {
 		return getDatabase(database).query(table);
 	}
 

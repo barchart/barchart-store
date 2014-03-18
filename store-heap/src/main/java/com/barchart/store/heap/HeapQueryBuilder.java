@@ -9,34 +9,34 @@ import rx.Subscription;
 
 import com.barchart.store.api.StoreRow;
 
-public class HeapQueryBuilder<T> extends QueryBuilderBase<T> {
+public class HeapQueryBuilder<R extends Comparable<R>, C extends Comparable<C>> extends QueryBuilderBase<R, C> {
 
-	protected final Collection<HeapRow<T>> rows;
+	protected final Collection<HeapRow<R, C>> rows;
 
-	public HeapQueryBuilder(final Collection<HeapRow<T>> rows_) {
+	public HeapQueryBuilder(final Collection<HeapRow<R, C>> rows_) {
 		rows = rows_;
 	}
 
 	@Override
-	public Observable<StoreRow<T>> build() {
+	public Observable<StoreRow<R, C>> build() {
 		return build(0);
 	}
 
 	@Override
-	public Observable<StoreRow<T>> build(final int limit) {
+	public Observable<StoreRow<R, C>> build(final int limit) {
 
-		return Observable.create(new Observable.OnSubscribeFunc<StoreRow<T>>() {
+		return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
 
 			@Override
 			public Subscription onSubscribe(
-					final Observer<? super StoreRow<T>> o) {
+					final Observer<? super StoreRow<R, C>> o) {
 
 				final AtomicBoolean running = new AtomicBoolean(true);
 				int ct = 0;
 
 				try {
 
-					for (final HeapRow<T> row : rows) {
+					for (final HeapRow<R, C> row : rows) {
 						if (!running.get() || (limit > 0 && ct >= limit)) {
 							o.onCompleted();
 							break;
@@ -67,7 +67,7 @@ public class HeapQueryBuilder<T> extends QueryBuilderBase<T> {
 	}
 
 	@Override
-	public Observable<StoreRow<T>> build(final int limit, final int batchSize) {
+	public Observable<StoreRow<R, C>> build(final int limit, final int batchSize) {
 		return build(limit);
 	}
 

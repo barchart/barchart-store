@@ -14,16 +14,16 @@ import com.google.common.collect.MapMaker;
 /**
  * Experimental, not for production.
  */
-public class IndexedHeapTable<V> extends HeapTable<String, V> {
+public class IndexedHeapTable<R extends Comparable<R>, V> extends HeapTable<R, String, V> {
 
-	private final Map<String, Map<Object, Collection<HeapRow<String>>>> indexes;
+	private final Map<String, Map<Object, Collection<HeapRow<R, String>>>> indexes;
 
 	public IndexedHeapTable(final ColumnDef... columns_) {
 
 		super(columns_);
 
 		indexes =
-				new ConcurrentHashMap<String, Map<Object, Collection<HeapRow<String>>>>();
+				new ConcurrentHashMap<String, Map<Object, Collection<HeapRow<R, String>>>>();
 
 		if (columns_ != null && columns_.length > 0) {
 			for (final ColumnDef def : columns_) {
@@ -31,7 +31,7 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 				if (def.isIndexed()) {
 					indexes.put(
 							def.key(),
-							new ConcurrentHashMap<Object, Collection<HeapRow<String>>>());
+							new ConcurrentHashMap<Object, Collection<HeapRow<R, String>>>());
 				}
 			}
 		}
@@ -39,18 +39,18 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 	}
 
 	@Override
-	public ObservableIndexQueryBuilder<String> query() throws Exception {
-		return new HeapIndexQueryBuilder<String>(indexes);
+	public ObservableIndexQueryBuilder<R, String> query() throws Exception {
+		return new HeapIndexQueryBuilder<R, String>(indexes);
 	}
 
 	@Override
-	protected HeapRow<String> remove(final String key) {
+	protected HeapRow<R, String> remove(final R key) {
 		return deindex(super.remove(key));
 	}
 
 	@Override
-	protected HeapRow<String> put(final String key, final HeapRow<String> row) {
-		final HeapRow<String> old = super.put(key, row);
+	protected HeapRow<R, String> put(final R key, final HeapRow<R, String> row) {
+		final HeapRow<R, String> old = super.put(key, row);
 		if (old != row && old != null) {
 			deindex(old);
 		}
@@ -58,9 +58,9 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 		return old;
 	}
 
-	private HeapRow<String> index(final HeapRow<String> row) {
+	private HeapRow<R, String> index(final HeapRow<R, String> row) {
 		if (row != null) {
-			for (final Map.Entry<String, Map<Object, Collection<HeapRow<String>>>> idx : indexes
+			for (final Map.Entry<String, Map<Object, Collection<HeapRow<R, String>>>> idx : indexes
 					.entrySet()) {
 				if (row.columns().contains(idx.getKey())) {
 					update(row, row.getImpl(idx.getKey()));
@@ -70,7 +70,7 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 		return row;
 	}
 
-	private HeapRow<String> deindex(final HeapRow<String> row) {
+	private HeapRow<R, String> deindex(final HeapRow<R, String> row) {
 		if (row != null) {
 			for (final String name : row.columns()) {
 				if (row.columns().contains(name)) {
@@ -81,7 +81,7 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 		return row;
 	}
 
-	protected void update(final HeapRow<String> row,
+	protected void update(final HeapRow<R, String> row,
 			final HeapColumn<String> column) {
 
 		if (column == null) {
@@ -90,7 +90,7 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 
 		final ColumnDef def = columns.get(column.getName());
 
-		final Map<Object, Collection<HeapRow<String>>> idx =
+		final Map<Object, Collection<HeapRow<R, String>>> idx =
 				indexes.get(column.getName());
 
 		try {
@@ -128,7 +128,7 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 
 	}
 
-	protected void remove(final HeapRow<String> row,
+	protected void remove(final HeapRow<R, String> row,
 			final HeapColumn<String> column) {
 
 		if (column == null) {
@@ -137,7 +137,7 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 
 		final ColumnDef def = columns.get(column.getName());
 
-		final Map<Object, Collection<HeapRow<String>>> idx =
+		final Map<Object, Collection<HeapRow<R, String>>> idx =
 				indexes.get(column.getName());
 
 		try {
@@ -168,19 +168,19 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 	}
 
 	private <T> void addIndex(
-			final Map<Object, Collection<HeapRow<String>>> map, final T value,
-			final HeapRow<String> row) {
+			final Map<Object, Collection<HeapRow<R, String>>> map, final T value,
+			final HeapRow<R, String> row) {
 
 		if (value == null) {
 			return;
 		}
 
-		Collection<HeapRow<String>> matches = map.get(value);
+		Collection<HeapRow<R, String>> matches = map.get(value);
 
 		if (matches == null) {
 
 			// Weak references to throw out deleted rows
-			final Map<HeapRow<String>, Boolean> backingMap =
+			final Map<HeapRow<R, String>, Boolean> backingMap =
 					new MapMaker().weakValues().makeMap();
 
 			matches = Collections.newSetFromMap(backingMap);
@@ -194,14 +194,14 @@ public class IndexedHeapTable<V> extends HeapTable<String, V> {
 	}
 
 	private <T> void removeIndex(
-			final Map<Object, Collection<HeapRow<String>>> map, final T value,
-			final HeapRow<String> row) {
+			final Map<Object, Collection<HeapRow<R, String>>> map, final T value,
+			final HeapRow<R, String> row) {
 
 		if (value == null) {
 			return;
 		}
 
-		final Collection<HeapRow<String>> matches = map.get(value);
+		final Collection<HeapRow<R, String>> matches = map.get(value);
 
 		if (matches != null) {
 			matches.remove(row);

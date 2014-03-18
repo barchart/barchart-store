@@ -9,7 +9,8 @@ public class MapperFactory {
 			new ConcurrentHashMap<Class<?>, Object>();
 
 	@SuppressWarnings("unchecked")
-	public <K, T, M extends RowMapper<K, T>> M instance(final Class<M> cls) {
+	public <R extends Comparable<R>, C extends Comparable<C>, T, M extends RowMapper<R, C, T>> M instance(
+			final Class<M> cls) {
 
 		if (!instances.containsKey(cls)) {
 			try {

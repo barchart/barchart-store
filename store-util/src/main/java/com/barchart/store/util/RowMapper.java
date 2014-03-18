@@ -10,7 +10,8 @@ import com.barchart.store.api.StoreRow;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public abstract class RowMapper<K, T> implements Func1<StoreRow<K>, T> {
+public abstract class RowMapper<R extends Comparable<R>, C extends Comparable<C>, T> implements
+		Func1<StoreRow<R, C>, T> {
 
 	private static final ObjectMapper mapper = new ObjectMapper();
 	static {
@@ -25,7 +26,7 @@ public abstract class RowMapper<K, T> implements Func1<StoreRow<K>, T> {
 	private final Logger log = LoggerFactory.getLogger(getClass());
 
 	@Override
-	public T call(final StoreRow<K> row) {
+	public T call(final StoreRow<R, C> row) {
 		try {
 			return decode(row);
 		} catch (final Exception e) {
@@ -34,10 +35,10 @@ public abstract class RowMapper<K, T> implements Func1<StoreRow<K>, T> {
 		}
 	}
 
-	public abstract void encode(final T obj, final RowMutator<K> mutator)
+	public abstract void encode(final T obj, final RowMutator<C> mutator)
 			throws Exception;
 
-	public abstract T decode(final StoreRow<K> row) throws Exception;
+	public abstract T decode(final StoreRow<R, C> row) throws Exception;
 
 	protected ObjectMapper mapper() {
 		return RowMapper.mapper;

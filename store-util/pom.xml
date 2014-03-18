@@ -11,7 +11,7 @@
 
 	<groupId>com.barchart.store</groupId>
 	<artifactId>store-util</artifactId>
-	<version>2.1.11-SNAPSHOT</version>
+	<version>3.0.0-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<description>
@@ -38,12 +38,7 @@ Data store utils
 		<dependency>
 			<groupId>com.barchart.store</groupId>
 			<artifactId>store-api</artifactId>
-			<version>[3.0-SNAPSHOT,4.0-SNAPSHOT)</version>
-		</dependency>
-
-		<dependency>
-		    <groupId>com.eaio.uuid</groupId>
-		    <artifactId>uuid</artifactId>
+			<version>[4.0-SNAPSHOT,4.1-SNAPSHOT)</version>
 		</dependency>
 
 		<dependency>

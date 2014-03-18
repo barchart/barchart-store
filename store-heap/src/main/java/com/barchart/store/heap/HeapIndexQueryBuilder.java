@@ -19,32 +19,32 @@ import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.StoreColumn;
 import com.barchart.store.api.StoreRow;
 
-public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
-		ObservableIndexQueryBuilder<T> {
+public class HeapIndexQueryBuilder<R extends Comparable<R>, C extends Comparable<C>> extends QueryBuilderBase<R, C>
+		implements ObservableIndexQueryBuilder<R, C> {
 
-	protected final Collection<HeapRow<T>> rows;
-	final Map<T, Map<Object, Collection<HeapRow<T>>>> indexes;
+	protected final Collection<HeapRow<R, C>> rows;
+	final Map<C, Map<Object, Collection<HeapRow<R, C>>>> indexes;
 	final List<FieldCompare> filters;
 
 	public HeapIndexQueryBuilder(
-			final Map<T, Map<Object, Collection<HeapRow<T>>>> indexes_) {
+			final Map<C, Map<Object, Collection<HeapRow<R, C>>>> indexes_) {
 		indexes = indexes_;
 		filters = new ArrayList<FieldCompare>();
 		if (indexes == null) {
-			rows = Collections.<HeapRow<T>> emptySet();
+			rows = Collections.<HeapRow<R, C>> emptySet();
 		} else {
-			rows = new HashSet<HeapRow<T>>();
+			rows = new HashSet<HeapRow<R, C>>();
 		}
 	}
 
 	@Override
-	public ObservableIndexQueryBuilder<T> where(final T column,
+	public ObservableIndexQueryBuilder<R, C> where(final C column,
 			final Object value) {
 		return where(column, value, Operator.EQUAL);
 	}
 
 	@Override
-	public ObservableIndexQueryBuilder<T> where(final T column,
+	public ObservableIndexQueryBuilder<R, C> where(final C column,
 			final Object value,
 			final com.barchart.store.api.ObservableIndexQueryBuilder.Operator op) {
 		filters.add(new FieldCompare(column, op, value));
@@ -52,12 +52,12 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 	}
 
 	@Override
-	public Observable<StoreRow<T>> build() {
+	public Observable<StoreRow<R, C>> build() {
 		return build(0);
 	}
 
 	@Override
-	public Observable<StoreRow<T>> build(final int limit) {
+	public Observable<StoreRow<R, C>> build(final int limit) {
 
 		if (indexes != null) {
 
@@ -81,14 +81,14 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 
 			for (final FieldCompare fc : filters) {
 
-				final Iterator<HeapRow<T>> iter;
+				final Iterator<HeapRow<R, C>> iter;
 
 				switch (fc.operator) {
 
 					case GT:
 						iter = rows.iterator();
 						while (iter.hasNext()) {
-							final HeapRow<T> row = iter.next();
+							final HeapRow<R, C> row = iter.next();
 							try {
 								if (compare(fc.value, row.get(fc.column)) <= 0) {
 									iter.remove();
@@ -102,7 +102,7 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 					case GTE:
 						iter = rows.iterator();
 						while (iter.hasNext()) {
-							final HeapRow<T> row = iter.next();
+							final HeapRow<R, C> row = iter.next();
 							try {
 								if (compare(fc.value, row.get(fc.column)) < 0) {
 									iter.remove();
@@ -116,7 +116,7 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 					case LT:
 						iter = rows.iterator();
 						while (iter.hasNext()) {
-							final HeapRow<T> row = iter.next();
+							final HeapRow<R, C> row = iter.next();
 							try {
 								if (compare(fc.value, row.get(fc.column)) >= 0) {
 									iter.remove();
@@ -130,7 +130,7 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 					case LTE:
 						iter = rows.iterator();
 						while (iter.hasNext()) {
-							final HeapRow<T> row = iter.next();
+							final HeapRow<R, C> row = iter.next();
 							try {
 								if (compare(fc.value, row.get(fc.column)) > 0) {
 									iter.remove();
@@ -144,7 +144,7 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 					case EQUAL:
 					default:
 
-						Collection<HeapRow<T>> matches =
+						Collection<HeapRow<R, C>> matches =
 								indexes.containsKey(fc.column) ? matches =
 										indexes.get(fc.column).get(fc.value)
 										: null;
@@ -169,18 +169,18 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 
 		}
 
-		return Observable.create(new Observable.OnSubscribeFunc<StoreRow<T>>() {
+		return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
 
 			@Override
 			public Subscription onSubscribe(
-					final Observer<? super StoreRow<T>> o) {
+					final Observer<? super StoreRow<R, C>> o) {
 
 				final AtomicBoolean running = new AtomicBoolean(true);
 				int ct = 0;
 
 				try {
 
-					for (final HeapRow<T> row : rows) {
+					for (final HeapRow<R, C> row : rows) {
 						if (!running.get() || (limit > 0 && ct >= limit)) {
 							o.onCompleted();
 							break;
@@ -211,11 +211,11 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 	}
 
 	@Override
-	public Observable<StoreRow<T>> build(final int limit, final int batchSize) {
+	public Observable<StoreRow<R, C>> build(final int limit, final int batchSize) {
 		return build(limit);
 	}
 
-	private int compare(final Object o1, final StoreColumn<T> o2)
+	private int compare(final Object o1, final StoreColumn<C> o2)
 			throws Exception {
 
 		if (o1.getClass() == String.class) {
@@ -243,11 +243,11 @@ public class HeapIndexQueryBuilder<T> extends QueryBuilderBase<T> implements
 	}
 
 	private class FieldCompare {
-		public T column;
+		public C column;
 		public Operator operator;
 		public Object value;
 
-		public FieldCompare(final T column_, final Operator operator_,
+		public FieldCompare(final C column_, final Operator operator_,
 				final Object value_) {
 			column = column_;
 			operator = operator_;

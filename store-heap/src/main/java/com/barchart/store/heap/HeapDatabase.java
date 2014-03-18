@@ -10,56 +10,67 @@ import com.barchart.store.api.ColumnDef;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.RowMutator;
-import com.barchart.store.api.StoreService.Table;
+import com.barchart.store.api.Table;
 
 public class HeapDatabase {
 
 	private final String databaseName;
 
-	private final Map<String, HeapTable<?, ?>> tableMap;
+	private final Map<String, HeapTable<?, ?, ?>> tableMap;
 
 	public HeapDatabase(final String databaseName) {
 		this.databaseName = databaseName;
-		this.tableMap = new HashMap<String, HeapTable<?, ?>>();
+		this.tableMap = new HashMap<String, HeapTable<?, ?, ?>>();
 	}
 
-	public <K, V> boolean has(final Table<K, V> table) throws Exception {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> boolean has(final Table<R, C, V> table)
+			throws Exception {
 		return tableMap.containsKey(table.name);
 	}
 
-	public <K, V> void create(final Table<K, V> table) throws Exception {
-		final HeapTable<K, V> heapTable = new HeapTable<K, V>();
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void create(final Table<R, C, V> table)
+			throws Exception {
+		final HeapTable<R, C, V> heapTable = new HeapTable<R, C, V>();
 		tableMap.put(table.name, heapTable);
 	}
 
-	public void create(final Table<String, String> table,
-			final ColumnDef... columns) throws Exception {
-		final HeapTable<String, String> heapTable =
-				new IndexedHeapTable<String>(columns);
-		tableMap.put(table.name, heapTable);
-	}
-
-	public <K, V> void update(final Table<K, V> table) throws Exception {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void update(final Table<R, C, V> table)
+			throws Exception {
 		throw new UnsupportedOperationException(
 				"Drop and recreate table to change type or column definitions");
 	}
 
-	public void update(final Table<String, String> table,
+	public <R extends Comparable<R>> void create(final Table<R, String, String> table,
+			final ColumnDef... columns) throws Exception {
+		final HeapTable<R, String, String> heapTable =
+				new IndexedHeapTable<R, String>(columns);
+		tableMap.put(table.name, heapTable);
+	}
+
+	public <R extends Comparable<R>> void update(final Table<R, String, String> table,
 			final ColumnDef... columns) throws Exception {
 		throw new UnsupportedOperationException(
 				"Drop and recreate table to change type or column definitions");
 	}
 
-	public <K, V> void delete(final Table<K, V> table) throws Exception {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void truncate(final Table<R, C, V> table)
+			throws Exception {
+		tableMap.get(table.name).truncate();
+	}
+
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void delete(final Table<R, C, V> table)
+			throws Exception {
 		tableMap.remove(table.name);
 	}
 
-	public <K, V> ObservableQueryBuilder<K> fetch(final Table<K, V> table,
-			final String... keys) throws Exception {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableQueryBuilder<R, C> fetch(
+			final Table<R, C, V> table,
+			final R... keys) throws Exception {
 		return get(table).fetch(keys);
 	}
 
-	public <K, V> ObservableIndexQueryBuilder<K> query(final Table<K, V> table)
+	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableIndexQueryBuilder<R, C> query(
+			final Table<R, C, V> table)
 			throws Exception {
 		return get(table).query();
 	}
@@ -68,11 +79,11 @@ public class HeapDatabase {
 		return new BatchImpl();
 	}
 
-	private <K, V> HeapTable<K, V> get(final Table<K, V> table) {
+	private <R extends Comparable<R>, C extends Comparable<C>, V> HeapTable<R, C, V> get(final Table<R, C, V> table) {
 		try {
 			@SuppressWarnings("unchecked")
-			final HeapTable<K, V> ht =
-					(HeapTable<K, V>) tableMap.get(table.name);
+			final HeapTable<R, C, V> ht =
+					(HeapTable<R, C, V>) tableMap.get(table.name);
 			if (ht == null) {
 				throw new IllegalStateException("No table \"" + table.name
 						+ "\" found in database: \"" + databaseName + "\"");
@@ -86,23 +97,23 @@ public class HeapDatabase {
 
 	private final class BatchImpl implements Batch {
 
-		private final List<HeapRowMutator<?>> mutators;
+		private final List<HeapRowMutator<?, ?>> mutators;
 
 		public BatchImpl() {
-			mutators = new ArrayList<HeapRowMutator<?>>();
+			mutators = new ArrayList<HeapRowMutator<?, ?>>();
 		}
 
 		@Override
-		public <K, V> RowMutator<K> row(final Table<K, V> table,
-				final String key) throws Exception {
-			final HeapRowMutator<K> mutator = get(table).mutator(key);
+		public <R extends Comparable<R>, C extends Comparable<C>, V> RowMutator<C> row(final Table<R, C, V> table,
+				final R key) throws Exception {
+			final HeapRowMutator<R, C> mutator = get(table).mutator(key);
 			mutators.add(mutator);
 			return mutator;
 		}
 
 		@Override
 		public void commit() throws Exception {
-			for (final HeapRowMutator<?> mutator : mutators) {
+			for (final HeapRowMutator<?, ?> mutator : mutators) {
 				mutator.apply();
 			}
 		}

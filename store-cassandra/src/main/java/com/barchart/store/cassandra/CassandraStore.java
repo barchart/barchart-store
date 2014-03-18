@@ -27,6 +27,7 @@ import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreColumn;
 import com.barchart.store.api.StoreRow;
 import com.barchart.store.api.StoreService;
+import com.barchart.store.api.Table;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.netflix.astyanax.AstyanaxContext;
@@ -232,71 +233,74 @@ public class CassandraStore implements StoreService {
 	}
 
 	@Override
-	public <K, V> boolean has(final String keyspace, final Table<K, V> table)
-			throws ConnectionException {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> boolean has(final String keyspace,
+			final Table<R, C, V> table) throws ConnectionException {
 		return clusterContext.getClient().getKeyspace(keyspace)
 				.describeKeyspace().getColumnFamily(table.name) != null;
 	}
 
 	@Override
-	public <K, V> void create(final String keyspace, final Table<K, V> table)
-			throws ConnectionException {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void create(final String keyspace,
+			final Table<R, C, V> table) throws ConnectionException {
 		clusterContext
 				.getClient()
 				.getKeyspace(keyspace)
 				.createColumnFamily(
-						new ColumnFamily<String, K>(table.name,
-								StringSerializer.get(), // Row
-								// key
-								serializerFor(table.keyType)), // Column key
+						new ColumnFamily<R, C>(table.name,
+								serializerFor(table.rowType), // Row key
+								serializerFor(table.columnType)), // Column key
 						getCFOptions(table));
 	}
 
 	@Override
-	public void create(final String keyspace,
-			final Table<String, String> table, final ColumnDef... columns)
-			throws ConnectionException {
+	public <R extends Comparable<R>> void create(final String keyspace, final Table<R, String, String> table,
+			final ColumnDef... columns) throws ConnectionException {
 		clusterContext
 				.getClient()
 				.getKeyspace(keyspace)
 				.createColumnFamily(
-						new ColumnFamily<String, String>(table.name,
-								StringSerializer.get(), // Row
-								// key
+						new ColumnFamily<R, String>(table.name,
+								serializerFor(table.rowType), // Row key
 								StringSerializer.get()), // Column key
 						getCFOptions(table, columns));
 	}
 
 	@Override
-	public <K, V> void update(final String keyspace, final Table<K, V> table)
-			throws Exception {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void update(final String keyspace,
+			final Table<R, C, V> table) throws Exception {
 		clusterContext
 				.getClient()
 				.getKeyspace(keyspace)
 				.updateColumnFamily(
-						new ColumnFamily<String, K>(table.name,
-								StringSerializer.get(), // Row key
-								serializerFor(table.keyType)), // Column key
+						new ColumnFamily<R, C>(table.name,
+								serializerFor(table.rowType), // Row key
+								serializerFor(table.columnType)), // Column key
 						getCFOptions(table));
 	}
 
 	@Override
-	public void update(final String keyspace,
-			final Table<String, String> table, final ColumnDef... columns)
+	public <R extends Comparable<R>> void update(final String keyspace,
+			final Table<R, String, String> table, final ColumnDef... columns)
 			throws Exception {
 		clusterContext
 				.getClient()
 				.getKeyspace(keyspace)
 				.updateColumnFamily(
-						new ColumnFamily<String, String>(table.name,
-								StringSerializer.get(), // Key Serializer
+						new ColumnFamily<R, String>(table.name,
+								serializerFor(table.rowType), // Row key
 								StringSerializer.get()),// Column serializer
 						getCFOptions(table, columns));
 	}
 
 	@Override
-	public <K, V> void delete(final String keyspace, final Table<K, V> table)
-			throws ConnectionException {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void truncate(final String keyspace,
+			final Table<R, C, V> table) throws ConnectionException {
+		clusterContext.getClient().getKeyspace(keyspace).truncateColumnFamily(table.name);
+	}
+
+	@Override
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void delete(final String keyspace,
+			final Table<R, C, V> table) throws ConnectionException {
 		clusterContext.getClient().getKeyspace(keyspace)
 				.dropColumnFamily(table.name);
 	}
@@ -354,18 +358,18 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private <K, V> Map<String, Object> getCFOptions(final Table<K, V> table,
-			final ColumnDef... columns) {
+	private <R extends Comparable<R>, C extends Comparable<C>, V> Map<String, Object> getCFOptions(
+			final Table<R, C, V> table, final ColumnDef... columns) {
 
-		final String keyValidator = validatorFor(table.keyType);
+		final String rowValidator = validatorFor(table.rowType);
+		final String columnValidator = validatorFor(table.columnType);
+		final String valueValidator = validatorFor(table.defaultValueType);
 
 		final ImmutableMap.Builder<String, Object> builder =
-				ImmutableMap
-						.<String, Object> builder()
-						.put("default_validation_class",
-								validatorFor(table.defaultValueType))
-						.put("key_validation_class", validatorFor(String.class))
-						.put("comparator_type", keyValidator);
+				ImmutableMap.<String, Object> builder()
+						.put("key_validation_class", rowValidator)
+						.put("comparator_type", columnValidator)
+						.put("default_validation_class", valueValidator);
 
 		if (columns != null && columns.length > 0) {
 
@@ -399,13 +403,13 @@ public class CassandraStore implements StoreService {
 				+ field.replaceAll("[-\\.]", "_") + "_idx";
 	}
 
-	private static <T> StoreRow<T> wrapRow(final Row<String, T> row) {
+	private static <R extends Comparable<R>, C extends Comparable<C>> StoreRow<R, C> wrapRow(final Row<R, C> row) {
 		return wrapColumns(row.getKey(), row.getColumns());
 	}
 
-	private static <T> StoreRow<T> wrapColumns(final String key,
-			final ColumnList<T> columns) {
-		return new StoreRowImpl<T>(key, columns);
+	private static <R extends Comparable<R>, C extends Comparable<C>> StoreRow<R, C> wrapColumns(final R key,
+			final ColumnList<C> columns) {
+		return new StoreRowImpl<R, C>(key, columns);
 	}
 
 	private static class CassandraRowMutator<T> implements RowMutator<T> {
@@ -478,8 +482,8 @@ public class CassandraStore implements StoreService {
 	}
 
 	@Override
-	public <K, V> Observable<Boolean> exists(final String database,
-			final Table<K, V> table, final String keys) throws Exception {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> Observable<Boolean> exists(final String database,
+			final Table<R, C, V> table, final R keys) throws Exception {
 
 		return Observable.create(new Observable.OnSubscribeFunc<Boolean>() {
 
@@ -489,9 +493,10 @@ public class CassandraStore implements StoreService {
 
 				try {
 
+					@SuppressWarnings("unchecked")
 					final Subscription sub =
 							fetch(database, table, keys).build().subscribe(
-									new Observer<StoreRow<K>>() {
+									new Observer<StoreRow<R, C>>() {
 
 										@Override
 										public void onCompleted() {
@@ -504,7 +509,7 @@ public class CassandraStore implements StoreService {
 										}
 
 										@Override
-										public void onNext(final StoreRow<K> row) {
+										public void onNext(final StoreRow<R, C> row) {
 											if (row.columns().size() > 0) {
 												observer.onNext(true);
 											} else {
@@ -540,25 +545,24 @@ public class CassandraStore implements StoreService {
 	}
 
 	@Override
-	public <K, V> ObservableQueryBuilder<K> fetch(final String database,
-			final Table<K, V> table, final String... keys) throws Exception {
+	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableQueryBuilder<R, C> fetch(
+			final String database, final Table<R, C, V> table, final R... keys) throws Exception {
 		if (keys == null || keys.length == 0) {
-			return new CassandraAllRowsQuery<K>(database, table,
+			return new CassandraAllRowsQuery<R, C>(database, table,
 					readConsistency, executor);
 		} else if (keys.length == 1) {
-			return new CassandraSingleRowQuery<K>(database, table,
+			return new CassandraSingleRowQuery<R, C>(database, table,
 					readConsistency, executor, keys[0]);
 		} else {
-			return new CassandraMultiRowQuery<K>(database, table,
+			return new CassandraMultiRowQuery<R, C>(database, table,
 					readConsistency, executor, keys);
 		}
 	}
 
 	@Override
-	public <K, V> ObservableIndexQueryBuilder<K> query(final String database,
-			final Table<K, V> table) throws Exception {
-		return new CassandraSearchQuery<K>(database, table, readConsistency,
-				executor);
+	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableIndexQueryBuilder<R, C> query(
+			final String database, final Table<R, C, V> table) throws Exception {
+		return new CassandraSearchQuery<R, C>(database, table, readConsistency, executor);
 	}
 
 	private static class CassandraBatchMutator implements Batch {
@@ -572,11 +576,10 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public <K, V> RowMutator<K> row(final Table<K, V> table,
-				final String key) throws Exception {
-			return new CassandraRowMutator<K>(m.withRow(
-					new ColumnFamily<String, K>(table.name, StringSerializer
-							.get(), serializerFor(table.keyType)), key));
+		public <R extends Comparable<R>, C extends Comparable<C>, V> RowMutator<C> row(final Table<R, C, V> table,
+				final R key) throws Exception {
+			return new CassandraRowMutator<C>(m.withRow(new ColumnFamily<R, C>(table.name,
+					serializerFor(table.rowType), serializerFor(table.columnType)), key));
 		}
 
 		@Override
@@ -586,46 +589,46 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private static final class StoreRowImpl<T> implements StoreRow<T> {
+	private static final class StoreRowImpl<R extends Comparable<R>, C extends Comparable<C>> implements StoreRow<R, C> {
 
-		private final String key;
-		private final ColumnList<T> columns;
+		private final R key;
+		private final ColumnList<C> columns;
 
-		StoreRowImpl(final String key_, final ColumnList<T> columns_) {
+		StoreRowImpl(final R key_, final ColumnList<C> columns_) {
 			key = key_;
 			columns = columns_;
 		}
 
 		@Override
-		public String getKey() {
+		public R getKey() {
 			return key;
 		}
 
 		@Override
-		public Collection<T> columns() {
+		public Collection<C> columns() {
 			return columns.getColumnNames();
 		}
 
 		@Override
-		public StoreColumn<T> getByIndex(final int index) {
-			final Column<T> c = columns.getColumnByIndex(index);
+		public StoreColumn<C> getByIndex(final int index) {
+			final Column<C> c = columns.getColumnByIndex(index);
 			if (c != null) {
-				return new StoreColumnImpl<T>(c);
+				return new StoreColumnImpl<C>(c);
 			}
 			return null;
 		}
 
 		@Override
-		public StoreColumn<T> get(final T name) {
-			final Column<T> c = columns.getColumnByName(name);
+		public StoreColumn<C> get(final C name) {
+			final Column<C> c = columns.getColumnByName(name);
 			if (c != null) {
-				return new StoreColumnImpl<T>(c);
+				return new StoreColumnImpl<C>(c);
 			}
 			return null;
 		}
 
 		@Override
-		public int compareTo(final StoreRow<T> o) {
+		public int compareTo(final StoreRow<R, C> o) {
 			return key.compareTo(o.getKey());
 		}
 
@@ -706,27 +709,27 @@ public class CassandraStore implements StoreService {
 		}
 	}
 
-	private abstract class CassandraBaseRowQuery<T> implements
-			ObservableQueryBuilder<T> {
+	private abstract class CassandraBaseRowQuery<R extends Comparable<R>, C extends Comparable<C>> implements
+			ObservableQueryBuilder<R, C> {
 
 		protected final Keyspace keyspace;
-		protected final ColumnFamilyQuery<String, T> query;
+		protected final ColumnFamilyQuery<R, C> query;
 		protected final Executor executor;
 
 		protected RangeBuilder columnRange = null;
-		protected T[] columns = null;
+		protected C[] columns = null;
 
 		private CassandraBaseRowQuery(final String database_,
-				final Table<T, ?> table_, final ConsistencyLevel level_,
+				final Table<R, C, ?> table_, final ConsistencyLevel level_,
 				final Executor executor_) throws ConnectionException {
 
 			keyspace = clusterContext.getClient().getKeyspace(database_);
 
 			query =
 					keyspace.prepareQuery(
-							new ColumnFamily<String, T>(table_.name,
-									StringSerializer.get(),
-									serializerFor(table_.keyType)))
+							new ColumnFamily<R, C>(table_.name,
+									serializerFor(table_.rowType),
+									serializerFor(table_.columnType)))
 							.setConsistencyLevel(level_);
 
 			executor = executor_;
@@ -734,7 +737,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public ObservableQueryBuilder<T> first(final int limit) {
+		public ObservableQueryBuilder<R, C> first(final int limit) {
 			if (columnRange == null) {
 				columnRange = new RangeBuilder();
 			}
@@ -743,7 +746,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public ObservableQueryBuilder<T> last(final int limit) {
+		public ObservableQueryBuilder<R, C> last(final int limit) {
 			if (columnRange == null) {
 				columnRange = new RangeBuilder();
 			}
@@ -752,14 +755,14 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public ObservableQueryBuilder<T> start(final T column) {
+		public ObservableQueryBuilder<R, C> start(final C column) {
 			if (columnRange == null) {
 				columnRange = new RangeBuilder();
 			}
 			if (column instanceof Boolean) {
 				columnRange.setStart((Boolean) column);
-			} else if (column instanceof byte[]) {
-				columnRange.setStart((byte[]) column);
+			} else if (column instanceof ByteBuffer) {
+				columnRange.setStart((ByteBuffer) column);
 			} else if (column instanceof Integer) {
 				columnRange.setStart((Integer) column);
 			} else if (column instanceof Double) {
@@ -779,14 +782,14 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public ObservableQueryBuilder<T> end(final T column) {
+		public ObservableQueryBuilder<R, C> end(final C column) {
 			if (columnRange == null) {
 				columnRange = new RangeBuilder();
 			}
 			if (column instanceof Boolean) {
 				columnRange.setEnd((Boolean) column);
-			} else if (column instanceof byte[]) {
-				columnRange.setEnd((byte[]) column);
+			} else if (column instanceof ByteBuffer) {
+				columnRange.setEnd((ByteBuffer) column);
 			} else if (column instanceof Integer) {
 				columnRange.setEnd((Integer) column);
 			} else if (column instanceof Double) {
@@ -806,7 +809,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public ObservableQueryBuilder<T> prefix(final String prefix) {
+		public ObservableQueryBuilder<R, C> prefix(final String prefix) {
 			if (columnRange == null) {
 				columnRange = new RangeBuilder();
 			}
@@ -815,21 +818,21 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public ObservableQueryBuilder<T> columns(final T... columns_) {
+		public ObservableQueryBuilder<R, C> columns(final C... columns_) {
 			columns = columns_;
 			return this;
 		}
 
 	}
 
-	private class CassandraSingleRowQuery<T> extends
-			CassandraBaseRowQuery<T> {
+	private class CassandraSingleRowQuery<R extends Comparable<R>, C extends Comparable<C>> extends
+			CassandraBaseRowQuery<R, C> {
 
-		private final String key;
+		private final R key;
 
 		private CassandraSingleRowQuery(final String database_,
-				final Table<T, ?> table_, final ConsistencyLevel level_,
-				final Executor executor_, final String key_)
+				final Table<R, C, ?> table_, final ConsistencyLevel level_,
+				final Executor executor_, final R key_)
 				throws ConnectionException {
 
 			super(database_, table_, level_, executor_);
@@ -838,9 +841,9 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build() {
+		public Observable<StoreRow<R, C>> build() {
 
-			final RowQuery<String, T> rowQuery = query.getKey(key);
+			final RowQuery<R, C> rowQuery = query.getKey(key);
 
 			if (columns != null) {
 				rowQuery.withColumnSlice(columns);
@@ -849,13 +852,12 @@ public class CassandraStore implements StoreService {
 			}
 
 			return Observable
-					.create(new Observable.OnSubscribeFunc<StoreRow<T>>() {
+					.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
 
 						@Override
-						public Subscription onSubscribe(
-								final Observer<? super StoreRow<T>> observer) {
+						public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
 
-							// Cassandra doesn't really do async
+							// Cassandra doesn't really do async well
 							// final
 							// ListenableFuture<OperationResult<ColumnList<T>>>
 							// future = rowQuery.executeAsync();
@@ -865,12 +867,9 @@ public class CassandraStore implements StoreService {
 								@Override
 								public void run() {
 									try {
-										final OperationResult<ColumnList<T>> result =
-												rowQuery.execute();
-										final ColumnList<T> columns =
-												result.getResult();
-										observer.onNext(wrapColumns(key,
-												columns));
+										final OperationResult<ColumnList<C>> result = rowQuery.execute();
+										final ColumnList<C> columns = result.getResult();
+										observer.onNext(wrapColumns(key, columns));
 										observer.onCompleted();
 									} catch (final Exception e) {
 										observer.onError(e);
@@ -893,26 +892,26 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build(final int limit) {
+		public Observable<StoreRow<R, C>> build(final int limit) {
 			return build();
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build(final int limit,
+		public Observable<StoreRow<R, C>> build(final int limit,
 				final int batchSize) {
 			return build();
 		}
 
 	}
 
-	private class CassandraMultiRowQuery<T> extends
-			CassandraBaseRowQuery<T> {
+	private class CassandraMultiRowQuery<R extends Comparable<R>, C extends Comparable<C>> extends
+			CassandraBaseRowQuery<R, C> {
 
-		private final String[] keys;
+		private final R[] keys;
 
 		private CassandraMultiRowQuery(final String database_,
-				final Table<T, ?> table_, final ConsistencyLevel level_,
-				final Executor executor_, final String... keys_)
+				final Table<R, C, ?> table_, final ConsistencyLevel level_,
+				final Executor executor_, final R... keys_)
 				throws ConnectionException {
 
 			super(database_, table_, level_, executor_);
@@ -921,14 +920,14 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build() {
+		public Observable<StoreRow<R, C>> build() {
 			return build(0);
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build(final int limit) {
+		public Observable<StoreRow<R, C>> build(final int limit) {
 
-			final RowSliceQuery<String, T> rowQuery = query.getKeySlice(keys);
+			final RowSliceQuery<R, C> rowQuery = query.getKeySlice(keys);
 
 			if (columns != null) {
 				rowQuery.withColumnSlice(columns);
@@ -937,26 +936,22 @@ public class CassandraStore implements StoreService {
 			}
 
 			return Observable
-					.create(new Observable.OnSubscribeFunc<StoreRow<T>>() {
+					.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
 
 						private volatile boolean complete = false;
 
 						@Override
-						public Subscription onSubscribe(
-								final Observer<? super StoreRow<T>> observer) {
+						public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
 
 							executor.execute(new Runnable() {
 
 								@Override
 								public void run() {
 									try {
-										final OperationResult<Rows<String, T>> result =
-												rowQuery.execute();
+										final OperationResult<Rows<R, C>> result = rowQuery.execute();
 										int ct = 0;
-										for (final Row<String, T> row : result
-												.getResult()) {
-											if (complete
-													|| (limit > 0 && ct >= limit)) {
+										for (final Row<R, C> row : result.getResult()) {
+											if (complete || (limit > 0 && ct >= limit)) {
 												break;
 											}
 											ct++;
@@ -984,18 +979,18 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build(final int limit,
+		public Observable<StoreRow<R, C>> build(final int limit,
 				final int batchSize) {
 			return build(limit);
 		}
 
 	}
 
-	private class CassandraAllRowsQuery<T> extends
-			CassandraBaseRowQuery<T> {
+	private class CassandraAllRowsQuery<R extends Comparable<R>, C extends Comparable<C>> extends
+			CassandraBaseRowQuery<R, C> {
 
 		private CassandraAllRowsQuery(final String database_,
-				final Table<T, ?> table_, final ConsistencyLevel level_,
+				final Table<R, C, ?> table_, final ConsistencyLevel level_,
 				final Executor executor_) throws ConnectionException {
 
 			super(database_, table_, level_, executor_);
@@ -1003,20 +998,20 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build() {
+		public Observable<StoreRow<R, C>> build() {
 			return build(0, 0);
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build(final int limit) {
+		public Observable<StoreRow<R, C>> build(final int limit) {
 			return build(limit, 0);
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build(final int limit,
+		public Observable<StoreRow<R, C>> build(final int limit,
 				final int batchSize) {
 
-			final AllRowsQuery<String, T> rowQuery = query.getAllRows();
+			final AllRowsQuery<R, C> rowQuery = query.getAllRows();
 
 			if (columns != null) {
 				rowQuery.withColumnSlice(columns);
@@ -1029,13 +1024,12 @@ public class CassandraStore implements StoreService {
 			}
 
 			return Observable
-					.create(new Observable.OnSubscribeFunc<StoreRow<T>>() {
+					.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
 
 						private volatile boolean complete = false;
 
 						@Override
-						public Subscription onSubscribe(
-								final Observer<? super StoreRow<T>> observer) {
+						public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
 
 							executor.execute(new Runnable() {
 
@@ -1043,14 +1037,11 @@ public class CassandraStore implements StoreService {
 								public void run() {
 									try {
 
-										final OperationResult<Rows<String, T>> result =
-												rowQuery.execute();
+										final OperationResult<Rows<R, C>> result = rowQuery.execute();
 
 										int ct = 0;
-										for (final Row<String, T> row : result
-												.getResult()) {
-											if (complete
-													|| (limit > 0 && ct >= limit)) {
+										for (final Row<R, C> row : result.getResult()) {
+											if (complete || (limit > 0 && ct >= limit)) {
 												break;
 											}
 											observer.onNext(wrapRow(row));
@@ -1088,27 +1079,24 @@ public class CassandraStore implements StoreService {
 		}
 	}
 
-	private class CassandraSearchQuery<T> extends
-			CassandraBaseRowQuery<T> implements ObservableIndexQueryBuilder<T> {
+	private class CassandraSearchQuery<R extends Comparable<R>, C extends Comparable<C>> extends
+			CassandraBaseRowQuery<R, C> implements ObservableIndexQueryBuilder<R, C> {
 
-		Map<T, List<ValueCompare>> filters;
+		Map<C, List<ValueCompare>> filters;
 
-		private CassandraSearchQuery(final String database_,
-				final Table<T, ?> table_, final ConsistencyLevel level_,
-				final Executor executor_) throws ConnectionException {
+		private CassandraSearchQuery(final String database_, final Table<R, C, ?> table_,
+				final ConsistencyLevel level_, final Executor executor_) throws ConnectionException {
 			super(database_, table_, level_, executor_);
-			filters = new HashMap<T, List<ValueCompare>>();
+			filters = new HashMap<C, List<ValueCompare>>();
 		}
 
 		@Override
-		public ObservableIndexQueryBuilder<T> where(final T column,
-				final Object value) {
+		public ObservableIndexQueryBuilder<R, C> where(final C column, final Object value) {
 			return where(column, value, Operator.EQUAL);
 		}
 
 		@Override
-		public ObservableIndexQueryBuilder<T> where(final T column,
-				final Object value, final Operator operator) {
+		public ObservableIndexQueryBuilder<R, C> where(final C column, final Object value, final Operator operator) {
 			List<ValueCompare> list = filters.get(column);
 			if (list == null) {
 				list = new ArrayList<ValueCompare>();
@@ -1119,24 +1107,23 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build() {
+		public Observable<StoreRow<R, C>> build() {
 			return build(0, 0);
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build(final int limit) {
+		public Observable<StoreRow<R, C>> build(final int limit) {
 			return build(limit, 0);
 		}
 
 		@Override
-		public Observable<StoreRow<T>> build(final int limit,
+		public Observable<StoreRow<R, C>> build(final int limit,
 				final int batchSize) {
 
-			IndexQuery<String, T> rowQuery = query.searchWithIndex();
+			IndexQuery<R, C> rowQuery = query.searchWithIndex();
 
 			boolean validQuery = filters.size() > 0 ? false : true;
-			outerloop: for (final Map.Entry<T, List<ValueCompare>> entry : filters
-					.entrySet()) {
+			outerloop: for (final Map.Entry<C, List<ValueCompare>> entry : filters.entrySet()) {
 				// Cassandra secondary index queries require at least one EQUAL
 				// clause to run for some reason
 				for (final ValueCompare vc : entry.getValue()) {
@@ -1148,20 +1135,15 @@ public class CassandraStore implements StoreService {
 			}
 
 			if (!validQuery) {
-				throw new IllegalArgumentException(
-						"Secondary index queries require at least one EQUAL term");
+				throw new IllegalArgumentException("Secondary index queries require at least one EQUAL term");
 			}
 
-			for (final Map.Entry<T, List<ValueCompare>> entry : filters
-					.entrySet()) {
+			for (final Map.Entry<C, List<ValueCompare>> entry : filters.entrySet()) {
 
 				for (final ValueCompare vc : entry.getValue()) {
 
-					final IndexOperationExpression<String, T> ops =
-							rowQuery.addExpression()
-									.whereColumn(entry.getKey());
-
-					final IndexValueExpression<String, T> exp;
+					final IndexOperationExpression<R, C> ops = rowQuery.addExpression().whereColumn(entry.getKey());
+					final IndexValueExpression<R, C> exp;
 
 					switch (vc.operator) {
 						case GT:
@@ -1211,54 +1193,49 @@ public class CassandraStore implements StoreService {
 				rowQuery.setRowLimit(batchSize);
 			}
 
-			final IndexQuery<String, T> indexQuery = rowQuery;
+			final IndexQuery<R, C> indexQuery = rowQuery;
 
-			return Observable
-					.create(new Observable.OnSubscribeFunc<StoreRow<T>>() {
+			return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
 
-						private volatile boolean complete = false;
+				private volatile boolean complete = false;
+
+				@Override
+				public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
+
+					executor.execute(new Runnable() {
 
 						@Override
-						public Subscription onSubscribe(
-								final Observer<? super StoreRow<T>> observer) {
+						public void run() {
+							try {
 
-							executor.execute(new Runnable() {
+								final OperationResult<Rows<R, C>> result = indexQuery.execute();
 
-								@Override
-								public void run() {
-									try {
-
-										final OperationResult<Rows<String, T>> result =
-												indexQuery.execute();
-
-										int ct = 0;
-										for (final Row<String, T> row : result
-												.getResult()) {
-											if (complete
-													|| (limit > 0 && ct >= limit)) {
-												break;
-											}
-											observer.onNext(wrapRow(row));
-											ct++;
-										}
-										observer.onCompleted();
-									} catch (final Exception e) {
-										observer.onError(e);
+								int ct = 0;
+								for (final Row<R, C> row : result.getResult()) {
+									if (complete || (limit > 0 && ct >= limit)) {
+										break;
 									}
+									observer.onNext(wrapRow(row));
+									ct++;
 								}
-
-							});
-
-							return new Subscription() {
-								@Override
-								public void unsubscribe() {
-									complete = true;
-								}
-							};
-
+								observer.onCompleted();
+							} catch (final Exception e) {
+								observer.onError(e);
+							}
 						}
 
 					});
+
+					return new Subscription() {
+						@Override
+						public void unsubscribe() {
+							complete = true;
+						}
+					};
+
+				}
+
+			});
 
 		}
 	}

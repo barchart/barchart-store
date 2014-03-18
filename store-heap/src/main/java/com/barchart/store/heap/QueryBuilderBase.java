@@ -12,59 +12,60 @@ import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.StoreColumn;
 import com.barchart.store.api.StoreRow;
 
-public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
+public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Comparable<C>> implements
+		ObservableQueryBuilder<R, C> {
 
-	protected Collection<T> columns = null;
-	protected T start = null;
-	protected T end = null;
+	protected Collection<C> columns = null;
+	protected C start = null;
+	protected C end = null;
 	protected int first = 0;
 	protected int last = 0;
 	protected String prefix = null;
 
 	@Override
-	public ObservableQueryBuilder<T> first(final int limit) {
+	public ObservableQueryBuilder<R, C> first(final int limit) {
 		first = limit;
 		return this;
 	}
 
 	@Override
-	public ObservableQueryBuilder<T> last(final int limit) {
+	public ObservableQueryBuilder<R, C> last(final int limit) {
 		last = limit;
 		return this;
 	}
 
 	@Override
-	public ObservableQueryBuilder<T> start(final T column) {
+	public ObservableQueryBuilder<R, C> start(final C column) {
 		start = column;
 		return this;
 	}
 
 	@Override
-	public ObservableQueryBuilder<T> end(final T column) {
+	public ObservableQueryBuilder<R, C> end(final C column) {
 		end = column;
 		return this;
 	}
 
 	@Override
-	public ObservableQueryBuilder<T> prefix(final String prefix_) {
+	public ObservableQueryBuilder<R, C> prefix(final String prefix_) {
 		prefix = prefix_;
 		return this;
 	}
 
 	@Override
-	public ObservableQueryBuilder<T> columns(final T... columns_) {
-		columns = new ArrayList<T>(Arrays.asList(columns_));
+	public ObservableQueryBuilder<R, C> columns(final C... columns_) {
+		columns = new ArrayList<C>(Arrays.asList(columns_));
 		return this;
 	}
 
-	protected class RowFilter implements StoreRow<T> {
+	protected class RowFilter implements StoreRow<R, C> {
 
-		private final HeapRow<T> row;
-		private final List<T> availColumns;
+		private final HeapRow<R, C> row;
+		private final List<C> availColumns;
 
-		public RowFilter(final HeapRow<T> row_) {
+		public RowFilter(final HeapRow<R, C> row_) {
 			row = row_;
-			availColumns = new ArrayList<T>();
+			availColumns = new ArrayList<C>();
 			buildColumnList();
 		}
 
@@ -73,7 +74,7 @@ public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
 			if (first > 0) {
 
 				int index = 0;
-				final Iterator<T> iter = row.columns().iterator();
+				final Iterator<C> iter = row.columns().iterator();
 
 				while (iter.hasNext() && index < first) {
 					availColumns.add(iter.next());
@@ -84,7 +85,7 @@ public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
 
 				int index = 0;
 				final int offset = row.columns().size() - last;
-				final Iterator<T> iter = row.columns().iterator();
+				final Iterator<C> iter = row.columns().iterator();
 
 				while (iter.hasNext()) {
 					if (index < offset) {
@@ -97,7 +98,7 @@ public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
 
 			} else if (start != null || end != null) {
 
-				final SortedSet<T> rc = row.columnsImpl();
+				final SortedSet<C> rc = row.columnsImpl();
 				if (start == null) {
 					start = rc.first();
 				} else if (end == null) {
@@ -112,10 +113,10 @@ public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
 
 			} else if (prefix != null) {
 
-				final Iterator<T> iter = row.columns().iterator();
+				final Iterator<C> iter = row.columns().iterator();
 
 				while (iter.hasNext()) {
-					final T name = iter.next();
+					final C name = iter.next();
 					if (name.toString().startsWith(prefix)) {
 						availColumns.add(name);
 					}
@@ -135,17 +136,17 @@ public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
 		}
 
 		@Override
-		public String getKey() {
+		public R getKey() {
 			return row.getKey();
 		}
 
 		@Override
-		public Collection<T> columns() {
+		public Collection<C> columns() {
 			return Collections.unmodifiableCollection(availColumns);
 		}
 
 		@Override
-		public StoreColumn<T> getByIndex(final int index) {
+		public StoreColumn<C> getByIndex(final int index) {
 
 			if (availColumns.size() > 0) {
 
@@ -162,7 +163,7 @@ public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
 		}
 
 		@Override
-		public StoreColumn<T> get(final T name) {
+		public StoreColumn<C> get(final C name) {
 			if (availColumns.size() == 0 || availColumns.contains(name)) {
 				return row.get(name);
 			}
@@ -170,7 +171,7 @@ public abstract class QueryBuilderBase<T> implements ObservableQueryBuilder<T> {
 		}
 
 		@Override
-		public int compareTo(final StoreRow<T> o) {
+		public int compareTo(final StoreRow<R, C> o) {
 			return getKey().compareTo(o.getKey());
 		}
 
