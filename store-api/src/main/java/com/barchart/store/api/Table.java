@@ -63,19 +63,19 @@ public class Table<R extends Comparable<R>, C extends Comparable<C>, V> {
 
 	/**
 	 * Create a new table definition with the specified key and value types.
-	 * 
+	 *
 	 * @deprecated Use builder() instead
 	 */
 	@Deprecated
-	public static <R extends Comparable<R>, C extends Comparable<C>, V> Table<R, C, V> make(final String name_,
-			final Class<R> rowType_, final Class<C> columnType_, final Class<V> valueType_) {
-		return new Table<R, C, V>(name_, rowType_, columnType_, valueType_, null);
+	public static <C extends Comparable<C>, V> Table<String, C, V> make(final String name_,
+			final Class<C> columnType_, final Class<V> valueType_) {
+		return new Table<String, C, V>(name_, String.class, columnType_, valueType_, null);
 	}
 
 	/**
 	 * Create a new table definition with the specified column key type, String
 	 * row keys and String column values.
-	 * 
+	 *
 	 * @deprecated Use builder() instead
 	 */
 	@Deprecated
@@ -87,7 +87,7 @@ public class Table<R extends Comparable<R>, C extends Comparable<C>, V> {
 	/**
 	 * Create a new table definition with String row keys, column keys and
 	 * values.
-	 * 
+	 *
 	 * @deprecated Use builder() instead
 	 */
 	@Deprecated
