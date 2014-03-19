@@ -9,6 +9,8 @@ import org.junit.Test;
 
 public class UUIDUtilTest {
 
+	TimeUUIDComparator cmp = new TimeUUIDComparator();
+
 	@Test
 	public void testTimestamp() throws Exception {
 
@@ -71,6 +73,10 @@ public class UUIDUtilTest {
 		verifyUUID(max);
 		assertEquals(timestamp, max.timestamp());
 
+		assertTrue(cmp.compare(min, gen) <= 0);
+		assertTrue(cmp.compare(min, max) <= 0);
+		assertTrue(cmp.compare(gen, max) <= 0);
+
 	}
 
 	@Test
@@ -92,9 +98,9 @@ public class UUIDUtilTest {
 			verifyUUID(max);
 
 			try {
-				verifyCompare(min, gen);
-				verifyCompare(min, max);
-				verifyCompare(gen, max);
+				assertTrue(cmp.compare(min, gen) <= 0);
+				assertTrue(cmp.compare(min, max) <= 0);
+				assertTrue(cmp.compare(gen, max) <= 0);
 			} catch (final AssertionError t) {
 				System.out.println("FAILED (" + i + "):\n");
 				System.out.print("min: ");
@@ -111,8 +117,7 @@ public class UUIDUtilTest {
 	}
 
 	private void verifyCompare(final UUID less, final UUID more) {
-		final int cmp = less.compareTo(more);
-		assertTrue(cmp <= 0);
+		assertTrue(cmp.compare(less, more) <= 0);
 	}
 
 	private void debugUUID(final UUID uuid) {

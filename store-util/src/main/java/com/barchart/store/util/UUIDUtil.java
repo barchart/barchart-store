@@ -8,450 +8,422 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.security.SecureRandom;
 import java.util.Enumeration;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 public final class UUIDUtil {
 
+	/**
+	 * Minimum possible value for node ID and clock sequences for sorting /
+	 * range queries.
+	 */
+	private final static long MIN_SEQUENCE_AND_NODE = 0x8000000000000000L;
+
+	/**
+	 * Maximum possible value for node ID and clock sequences for sorting /
+	 * range queries.
+	 */
+	private final static long MAX_SEQUENCE_AND_NODE = 0xBFFFFFFFFFFFFFFFL;
+
 	// This comes from Hector's TimeUUIDUtils class:
 	// https://github.com/rantav/hector/blob/master/core/src/main/java/me/...
 	private static final long NUM_100NS_INTERVALS_SINCE_UUID_EPOCH = 0x01b21dd213814000L;
 
 	/**
-	 * The cached MAC address.
+	 * Local node/sequence mask.
 	 */
-    private static String macAddress = null;
-
-    /**
-	 * The current clock sequences and node value.
-	 */
-    private static long clockSeqAndNode = 0x8000000000000000L;
-	private static long minClockSeqAndNode = 0x8000000000000000L;
-	private static long maxClockSeqAndNode = 0xBFFFFFFFFFFFFFFFL;
+	private static long clockSeqAndNode = MIN_SEQUENCE_AND_NODE | NodeUtil.node();
 
 	/**
-	 * Local node sequence number
+	 * Current local sequence number.
 	 */
-    private static AtomicLong sequence = new AtomicLong((long)(Math.random() * 0x3FFF));
+	private static AtomicLong sequence = new AtomicLong((long) (Math.random() * 0x3FFF));
 
 	private UUIDUtil() {
 	}
 
 	/**
-	 * Creates a new UUID using current system time and clock sequence
-	 *
-	 * @return
+	 * Creates a new UUID using current system time and clock sequence.
 	 */
 	public static final UUID timeUUID() {
 		return new UUID(newTime(), getClockSeqAndNode());
 	}
 
 	/**
-	 * Creates a new UUID using provided time and current clock sequence
-	 *
-	 * @return
+	 * Creates a new UUID using provided time and current clock sequence.
 	 */
 	public static final UUID timeUUID(final long time) {
 		return new UUID(createTime(time), getClockSeqAndNode());
 	}
 
 	/**
-	 * Creates a new UUID using provided time and lowest possible clock sequence
-	 *
-	 * @return
+	 * Creates a new UUID using provided time and lowest possible clock
+	 * sequence.
 	 */
 	public static final UUID timeUUIDMin(final long time) {
-		return new UUID(createTime(time), minClockSeqAndNode);
+		return new UUID(createTime(time), MIN_SEQUENCE_AND_NODE);
 	}
 
 	/**
 	 * Creates a new UUID using provided time and largest possible clock
-	 * sequence
-	 *
-	 * @return
+	 * sequence.
 	 */
 	public static final UUID timeUUIDMax(final long time) {
-		return new UUID(createTime(time), maxClockSeqAndNode);
+		return new UUID(createTime(time), MAX_SEQUENCE_AND_NODE);
 	}
 
+	/**
+	 * Parse an epoch timestamp from the UUID's embedded timestamp.
+	 */
 	public static final long timestampFrom(final UUID uuid) {
 		return (uuid.timestamp() - NUM_100NS_INTERVALS_SINCE_UUID_EPOCH) / 10000;
 	}
 
+	/**
+	 * Create a new UUID timestamp from the current system time.
+	 */
 	private static long newTime() {
 		return createTime(System.currentTimeMillis());
 	}
 
 	/**
-	 * Creates a new time field from the given timestamp.
-	 *
-	 * @param curTime the time stamp
-	 * @return
+	 * Creates a new time field from the given epoch timestamp.
 	 */
-	static long createTime(final long curTime) {
+	static long createTime(final long timestamp) {
 
-		final long timeMillis = (curTime * 10000) + NUM_100NS_INTERVALS_SINCE_UUID_EPOCH;
+		final long timeMillis = (timestamp * 10000) + NUM_100NS_INTERVALS_SINCE_UUID_EPOCH;
 
-		// time low
-		long time = timeMillis << 32;
-
-		// time mid
-		time |= (timeMillis & 0xFFFF00000000L) >> 16;
-
-		// time hi and version
-		time |= 0x1000 | ((timeMillis >> 48) & 0x0FFF); // version 1
-
-		return time;
+		return timeMillis << 32 // time low
+				| ((timeMillis >> 16) & 0xFFFF0000) // time mid
+				| ((timeMillis >> 48) & 0x0FFF) // time hi
+				| 0x1000; // version 1
 
 	}
 
-    /**
-     * Increments the sequence and returns the new clockSeqAndNode value.
-     *
-     * @return the clockSeqAndNode value
-     * @see UUID#getClockSeqAndNode()
-     */
-    private static long getClockSeqAndNode() {
-    	return clockSeqAndNode | ((sequence.getAndIncrement() & 0x3FFF) << 48);
-    }
+	/**
+	 * Increments the sequence and returns the new node/sequence value for the
+	 * next UUID.
+	 */
+	private static long getClockSeqAndNode() {
+		return clockSeqAndNode | ((sequence.getAndIncrement() & 0x3FFF) << 48);
+	}
 
-	 /**
-     * Returns the first line of the shell command.
-     *
-     * @param commands the commands to run
-     * @return the first line of the command
-     * @throws IOException
-     */
-   private static String getFirstLineOfCommand(final String... commands) throws IOException {
+	/*
+	 * Local node identity / initialization
+	 */
 
-        Process p = null;
-        BufferedReader reader = null;
+	private static class NodeUtil {
 
-        try {
-            p = Runtime.getRuntime().exec(commands);
-            reader = new BufferedReader(new InputStreamReader(p.getInputStream()), 128);
-            return reader.readLine();
-        } finally {
-            if (p != null) {
-                if (reader != null) {
-                    try {
-                        reader.close();
-                    } catch (final IOException ex) {
-                        // Ignore it.
-                    }
-                } try {
-                    p.getErrorStream().close();
-                } catch (final IOException ex) {
-                    // Ignore it.
-                }
+		private static final SecureRandom random = new SecureRandom();
 
-                try {
-                    p.getOutputStream().close();
-                } catch (final IOException ex) {
-                    // Ignore it.
-                }
-                p.destroy();
-            }
-        }
-
-    }
-
-	private static final char[] DIGITS = {
-			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a',
-			'b', 'c', 'd', 'e', 'f'
-	};
-
-	static {
-
-		try {
-			macAddress = new HardwareAddressLookup().toString();
-		} catch (final Throwable t) {
-			t.printStackTrace();
+		private NodeUtil() {
 		}
 
-		if (macAddress == null) {
+		public static long node() {
+
+			long node = fromJava();
+
+			if (node == 0) {
+				node = fromSystem();
+			}
+
+			if (node == 0) {
+				node = fromInet();
+			}
+
+			if (node == 0) {
+				node = fromRandom();
+			}
+
+			return node;
+
+		}
+
+		/**
+		 * Generate node ID by looking up MAC address from JVM.
+		 */
+		private static long fromJava() {
+
+			long addr = 0;
+
+			try {
+				final Enumeration<NetworkInterface> ifs = NetworkInterface.getNetworkInterfaces();
+				if (ifs != null) {
+					while (ifs.hasMoreElements()) {
+						final NetworkInterface iface = ifs.nextElement();
+						final byte[] hw = iface.getHardwareAddress();
+						if (hw != null && hw.length == 6 && hw[1] != (byte) 0xff) {
+							for (int i = 0; i < hw.length; i++) {
+								addr = (addr << 8) | (hw[i] & 0xFFl);
+							}
+							break;
+						}
+					}
+				}
+			} catch (final SocketException ex) {
+				// Ignore it.
+			}
+
+			return addr;
+
+		}
+
+		/**
+		 * Generate node ID by looking up MAC address from local OS.
+		 */
+		private static long fromSystem() {
 
 			Process p = null;
 			BufferedReader in = null;
 
 			try {
+
 				final String osname = System.getProperty("os.name", "");
 
 				if (osname.startsWith("Windows")) {
-					p = Runtime.getRuntime().exec(new String[] {
-							"ipconfig", "/all"
-					}, null);
-				}
-				// Solaris code must appear before the generic code
-				else if (osname.startsWith("Solaris")
-						|| osname.startsWith("SunOS")) {
-					final String hostName = getFirstLineOfCommand("uname", "-n");
+					p = openProcess("ipconfig", "/all");
+				} else if (osname.startsWith("Solaris") || osname.startsWith("SunOS")) {
+					// Solaris code must appear before the generic code
+					final String hostName = getFirstLineOfCommand(openProcess("uname", "-n"));
 					if (hostName != null) {
-						p = Runtime.getRuntime().exec(
-								new String[] {
-										"/usr/sbin/arp", hostName
-								}, null);
+						p = openProcess("/usr/sbin/arp", hostName);
 					}
 				} else if (new File("/usr/sbin/lanscan").exists()) {
-					p = Runtime.getRuntime().exec(new String[] {
-						"/usr/sbin/lanscan"
-					}, null);
+					p = openProcess("/usr/sbin/lanscan");
 				} else if (new File("/sbin/ifconfig").exists()) {
-					p = Runtime.getRuntime().exec(new String[] {
-							"/sbin/ifconfig", "-a"
-					}, null);
+					p = openProcess("/sbin/ifconfig", "-a");
 				}
 
 				if (p != null) {
 					in = new BufferedReader(new InputStreamReader(p.getInputStream()), 128);
 					String l = null;
 					while ((l = in.readLine()) != null) {
-						macAddress = MACAddressParser.parse(l);
-						if (macAddress != null && parseShort(macAddress) != 0xff) {
-							break;
+						final long node = parseForMacAddress(l);
+						if (node != 0) {
+							return node;
 						}
 					}
 				}
 
-			} catch (final SecurityException ex) {
-				// Ignore it.
-			} catch (final IOException ex) {
-				// Ignore it.
+			} catch (final Throwable t) {
+				t.printStackTrace();
+
 			} finally {
-				if (p != null) {
-					if (in != null) {
-						try {
-							in.close();
-						} catch (final IOException ex) {
-							// Ignore it.
-						}
-					}
 
+				if (in != null) {
 					try {
-						p.getErrorStream().close();
+						in.close();
 					} catch (final IOException ex) {
 						// Ignore it.
 					}
-
-					try {
-						p.getOutputStream().close();
-					} catch (final IOException ex) {
-						// Ignore it.
-					}
-					p.destroy();
 				}
+
+				closeProcess(p);
+
+			}
+
+			return 0;
+
+		}
+
+		/**
+		 * Generate node ID from local IP address.
+		 */
+		private static long fromInet() {
+
+			try {
+				long node = 0;
+				final byte[] local = InetAddress.getLocalHost().getAddress();
+				node |= (local[0] << 24) & 0xFF000000L;
+				node |= (local[1] << 16) & 0xFF0000;
+				node |= (local[2] << 8) & 0xFF00;
+				node |= local[3] & 0xFF;
+				return node;
+			} catch (final UnknownHostException ex) {
+			}
+
+			return 0;
+
+		}
+
+		/**
+		 * Random node ID.
+		 */
+		private static long fromRandom() {
+			return (long) (random.nextDouble() * 0x7FFFFFFF);
+		}
+
+		/**
+		 * Open a local shell process.
+		 */
+		private static Process openProcess(final String... commands) throws IOException {
+			return Runtime.getRuntime().exec(commands, null);
+		}
+
+		/**
+		 * Close/cleanup a local shell process.
+		 */
+		private static void closeProcess(final Process process) {
+
+			if (process != null) {
+
+				try {
+					process.getErrorStream().close();
+				} catch (final IOException ex) {
+					// Ignore it.
+				}
+
+				try {
+					process.getOutputStream().close();
+				} catch (final IOException ex) {
+					// Ignore it.
+				}
+
+				process.destroy();
+
 			}
 
 		}
 
-		if (macAddress != null) {
-			clockSeqAndNode |= parseLong(macAddress);
-		} else {
+		/**
+		 * Returns the first output line of the given shell command.
+		 *
+		 * @param commands The command/arguments to run
+		 */
+		private static String getFirstLineOfCommand(final Process p) throws IOException {
+
+			BufferedReader reader = null;
+
 			try {
-				final byte[] local = InetAddress.getLocalHost().getAddress();
-				clockSeqAndNode |= (local[0] << 24) & 0xFF000000L;
-				clockSeqAndNode |= (local[1] << 16) & 0xFF0000;
-				clockSeqAndNode |= (local[2] << 8) & 0xFF00;
-				clockSeqAndNode |= local[3] & 0xFF;
-			} catch (final UnknownHostException ex) {
-				clockSeqAndNode |= (long) (Math.random() * 0x7FFFFFFF);
+
+				reader = new BufferedReader(new InputStreamReader(p.getInputStream()), 128);
+				return reader.readLine();
+
+			} finally {
+
+				if (reader != null) {
+					try {
+						reader.close();
+					} catch (final IOException ex) {
+						// Ignore it.
+					}
+				}
+
+				closeProcess(p);
+
 			}
+
+		}
+
+		/**
+		 * Attempts to find a pattern in the given String.
+		 *
+		 * @param in the String, may not be <code>null</code>
+		 * @return the substring that matches this pattern or <code>null</code>
+		 */
+		private static long parseForMacAddress(final String in) {
+
+			String out = in;
+
+			// lanscan
+
+			final int hexStart = out.indexOf("0x");
+
+			if (hexStart != -1 && out.indexOf("ETHER") != -1) {
+
+				final int hexEnd = out.indexOf(' ', hexStart);
+
+				if (hexEnd > hexStart + 2) {
+					out = out.substring(hexStart, hexEnd);
+				}
+
+			} else {
+
+				int octets = 0;
+				int lastIndex, old, end;
+
+				if (out.indexOf('-') > -1) {
+					out = out.replace('-', ':');
+				}
+
+				lastIndex = out.lastIndexOf(':');
+
+				if (lastIndex > out.length() - 2) {
+					out = null;
+				} else {
+
+					end = Math.min(out.length(), lastIndex + 3);
+					++octets;
+					old = lastIndex;
+					while (octets != 5 && lastIndex != -1 && lastIndex > 1) {
+						lastIndex = out.lastIndexOf(':', --lastIndex);
+						if (old - lastIndex == 3 || old - lastIndex == 2) {
+							++octets;
+							old = lastIndex;
+						}
+					}
+
+					if (octets == 5 && lastIndex > 1) {
+						out = out.substring(lastIndex - 2, end).trim();
+					} else {
+						out = null;
+					}
+
+				}
+
+			}
+
+			if (out != null && out.startsWith("0x")) {
+				out = out.substring(2);
+			}
+
+			if (out != null && parseHex(out, 4) != 0xff) {
+				return parseHex(out, 16);
+			}
+
+			return 0;
+
+		}
+
+		/**
+		 * Parses a <code>long</code> from a hex encoded number. This method
+		 * will skip all characters that are not 0-9, A-F and a-f.
+		 *
+		 * Returns 0 if the {@link CharSequence} does not contain any
+		 * interesting characters.
+		 */
+		private static long parseHex(final CharSequence s, final int octets) {
+
+			long out = 0;
+			byte quartets = 0;
+			char c;
+			byte b;
+
+			for (int i = 0; i < s.length() && quartets < octets * 2; i++) {
+
+				c = s.charAt(i);
+
+				if ((c > 47) && (c < 58)) {
+					b = (byte) (c - 48);
+				} else if ((c > 64) && (c < 71)) {
+					b = (byte) (c - 55);
+				} else if ((c > 96) && (c < 103)) {
+					b = (byte) (c - 87);
+				} else {
+					continue;
+				}
+
+				out = (out << 4) | b;
+				quartets++;
+
+			}
+
+			return out;
+
 		}
 
 	}
-
-	/**
-     * Scans MAC addresses for good ones.
-     */
-    static class HardwareAddressLookup {
-
-        /**
-         * @see java.lang.Object#toString()
-         */
-        @Override
-        public String toString() {
-            String out = null;
-            try {
-                final Enumeration<NetworkInterface> ifs = NetworkInterface.getNetworkInterfaces();
-                if (ifs != null) {
-                    while (ifs.hasMoreElements()) {
-                        final NetworkInterface iface = ifs.nextElement();
-                        final byte[] hardware = iface.getHardwareAddress();
-                        if (hardware != null && hardware.length == 6
-                                && hardware[1] != (byte) 0xff) {
-                            out = append(new StringBuilder(36), hardware).toString();
-                            break;
-                        }
-                    }
-                }
-            } catch (final SocketException ex) {
-                // Ignore it.
-            }
-            return out;
-        }
-
-    }
-
-    private static class MACAddressParser {
-
-    	 /**
-         * No instances needed.
-         */
-        private MACAddressParser() {
-            super();
-        }
-
-        /**
-         * Attempts to find a pattern in the given String.
-         *
-         * @param in the String, may not be <code>null</code>
-         * @return the substring that matches this pattern or <code>null</code>
-         */
-        static String parse(final String in) {
-
-            String out = in;
-
-            // lanscan
-
-            final int hexStart = out.indexOf("0x");
-            if (hexStart != -1 && out.indexOf("ETHER") != -1) {
-                final int hexEnd = out.indexOf(' ', hexStart);
-                if (hexEnd > hexStart + 2) {
-                    out = out.substring(hexStart, hexEnd);
-                }
-            }
-
-            else {
-
-                int octets = 0;
-                int lastIndex, old, end;
-
-                if (out.indexOf('-') > -1) {
-                    out = out.replace('-', ':');
-                }
-
-                lastIndex = out.lastIndexOf(':');
-
-                if (lastIndex > out.length() - 2) {
-                    out = null;
-                } else {
-
-                    end = Math.min(out.length(), lastIndex + 3);
-                    ++octets;
-                    old = lastIndex;
-                    while (octets != 5 && lastIndex != -1 && lastIndex > 1) {
-                        lastIndex = out.lastIndexOf(':', --lastIndex);
-                        if (old - lastIndex == 3 || old - lastIndex == 2) {
-                            ++octets;
-                            old = lastIndex;
-                        }
-                    }
-
-                    if (octets == 5 && lastIndex > 1) {
-                        out = out.substring(lastIndex - 2, end).trim();
-                    } else {
-                        out = null;
-                    }
-
-                }
-
-            }
-
-            if (out != null && out.startsWith("0x")) {
-                out = out.substring(2);
-            }
-
-            return out;
-        }
-
-    }
-
-    /**
-     * Turns a <code>byte</code> array into hex octets.
-     *
-     * @param a the {@link Appendable}, may not be <code>null</code>
-     * @param bytes the <code>byte</code> array
-     * @return {@link Appendable}
-     */
-    private static Appendable append(final Appendable a, final byte[] bytes) {
-        try {
-            for (final byte b : bytes) {
-                a.append(DIGITS[(byte) ((b & 0xF0) >> 4)]);
-                a.append(DIGITS[(byte) (b & 0x0F)]);
-            }
-        }
-        catch (final IOException ex) {
-            // Bla
-        }
-        return a;
-    }
-
-    /**
-     * Parses a <code>long</code> from a hex encoded number. This method will skip all characters that are not 0-9,
-     * A-F and a-f.
-     * <p>
-     * Returns 0 if the {@link CharSequence} does not contain any interesting characters.
-     *
-     * @param s the {@link CharSequence} to extract a <code>long</code> from, may not be <code>null</code>
-     * @return a <code>long</code>
-     * @throws NullPointerException if the {@link CharSequence} is <code>null</code>
-     */
-    private static long parseLong(final CharSequence s) {
-        long out = 0;
-        byte shifts = 0;
-        char c;
-        for (int i = 0; i < s.length() && shifts < 16; i++) {
-            c = s.charAt(i);
-            if ((c > 47) && (c < 58)) {
-                ++shifts;
-                out <<= 4;
-                out |= c - 48;
-            } else if ((c > 64) && (c < 71)) {
-                ++shifts;
-                out <<= 4;
-                out |= c - 55;
-            } else if ((c > 96) && (c < 103)) {
-                ++shifts;
-                out <<= 4;
-                out |= c - 87;
-            }
-        }
-        return out;
-    }
-
-    /**
-     * Parses a <code>short</code> from a hex encoded number. This method will skip all characters that are not 0-9,
-     * A-F and a-f.
-     * <p>
-     * Returns 0 if the {@link CharSequence} does not contain any interesting characters.
-     *
-     * @param s the {@link CharSequence} to extract a <code>short</code> from, may not be <code>null</code>
-     * @return a <code>short</code>
-     * @throws NullPointerException if the {@link CharSequence} is <code>null</code>
-     */
-     private static short parseShort(final String s) {
-        short out = 0;
-        byte shifts = 0;
-        char c;
-        for (int i = 0; i < s.length() && shifts < 4; i++) {
-            c = s.charAt(i);
-            if ((c > 47) && (c < 58)) {
-                ++shifts;
-                out <<= 4;
-                out |= c - 48;
-            } else if ((c > 64) && (c < 71)) {
-                ++shifts;
-                out <<= 4;
-                out |= c - 55;
-            } else if ((c > 96) && (c < 103)) {
-                ++shifts;
-                out <<= 4;
-                out |= c - 87;
-            }
-        }
-        return out;
-    }
-
 
 }
