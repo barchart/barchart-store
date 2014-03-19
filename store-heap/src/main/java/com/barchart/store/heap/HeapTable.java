@@ -79,4 +79,8 @@ public class HeapTable<R extends Comparable<R>, C extends Comparable<C>, V> {
 		return rows.put(key, row);
 	}
 
+	Table<R, C, V> definition() {
+		return table;
+	}
+
 }

@@ -2,6 +2,7 @@ package com.barchart.store.heap;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentNavigableMap;
@@ -18,6 +19,11 @@ public class HeapRow<R extends Comparable<R>, C extends Comparable<C>> implement
 	public HeapRow(final R key_) {
 		key = key_;
 		columns = new ConcurrentSkipListMap<C, HeapColumn<C>>();
+	}
+
+	public HeapRow(final R key_, final Comparator<C> comparator_) {
+		key = key_;
+		columns = new ConcurrentSkipListMap<C, HeapColumn<C>>(comparator_);
 	}
 
 	@Override

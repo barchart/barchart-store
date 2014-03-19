@@ -1,8 +1,10 @@
 package com.barchart.store.heap;
 
 import java.nio.ByteBuffer;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 import com.barchart.store.api.RowMutator;
 
@@ -72,6 +74,7 @@ public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> im
 		delete = true;
 	}
 
+	@SuppressWarnings("unchecked")
 	protected void apply() {
 
 		if (delete) {
@@ -83,7 +86,12 @@ public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> im
 			HeapRow<R, K> row = table.get(key);
 
 			if (row == null) {
-				row = new HeapRow<R, K>(key);
+				// Force UUID to use time-based comparator for columns
+				if (table.definition().columnType() == UUID.class) {
+					row = new HeapRow<R, K>(key, (Comparator<K>) HeapStore.UUID_COMPARATOR);
+				} else {
+					row = new HeapRow<R, K>(key);
+				}
 			}
 
 			// Apply inserts/updates

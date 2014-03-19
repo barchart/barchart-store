@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>com.barchart.base</groupId>
 		<artifactId>barchart-archon</artifactId>
-		<version>2.5.19</version>
+		<version>2.6.22</version>
 		<relativePath />
 	</parent>
 
@@ -39,6 +39,12 @@ Cassandra data store implementation and OSGI components
 			<groupId>com.barchart.store</groupId>
 			<artifactId>store-api</artifactId>
 			<version>[4.0-SNAPSHOT,4.1-SNAPSHOT)</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.barchart.store</groupId>
+			<artifactId>store-util</artifactId>
+			<version>[3-SNAPSHOT,4-SNAPSHOT)</version>
 		</dependency>
 
 		<dependency>

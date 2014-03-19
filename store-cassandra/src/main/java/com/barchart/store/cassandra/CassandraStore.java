@@ -724,7 +724,7 @@ public class CassandraStore implements StoreService {
 			if (columnRange == null) {
 				columnRange = new RangeBuilder();
 			}
-			columnRange.setLimit(limit);
+			columnRange.setReversed(false).setLimit(limit);
 			return this;
 		}
 

@@ -1,7 +1,9 @@
 package com.barchart.store.heap;
 
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import rx.Observable;
 import rx.Observer;
@@ -13,10 +15,13 @@ import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.StoreRow;
 import com.barchart.store.api.StoreService;
 import com.barchart.store.api.Table;
+import com.barchart.store.util.TimeUUIDComparator;
 
 public class HeapStore implements StoreService {
 
 	private final Map<String, HeapDatabase> databaseMap;
+
+	static final Comparator<UUID> UUID_COMPARATOR = new TimeUUIDComparator();
 
 	public HeapStore() {
 		this.databaseMap = new HashMap<String, HeapDatabase>();
