@@ -116,10 +116,6 @@ public class UUIDUtilTest {
 
 	}
 
-	private void verifyCompare(final UUID less, final UUID more) {
-		assertTrue(cmp.compare(less, more) <= 0);
-	}
-
 	private void debugUUID(final UUID uuid) {
 
 		System.out.println(uuid);
