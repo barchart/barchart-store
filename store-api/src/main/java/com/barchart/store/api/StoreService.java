@@ -118,15 +118,13 @@ public interface StoreService {
 	 * Check if the specified row key exists in a table.
 	 */
 	<R extends Comparable<R>, C extends Comparable<C>, V> Observable<Boolean> exists(String database,
-			Table<R, C, V> table,
-			R key) throws Exception;
+			Table<R, C, V> table, R key) throws Exception;
 
 	/**
 	 * Fetch a set of rows by row key.
 	 */
 	<R extends Comparable<R>, C extends Comparable<C>, V> ObservableQueryBuilder<R, C> fetch(String database,
-			Table<R, C, V> table,
-			R... keys) throws Exception;
+			Table<R, C, V> table, R... keys) throws Exception;
 
 	/**
 	 * Query for rows from a secondary column value index. There must be at

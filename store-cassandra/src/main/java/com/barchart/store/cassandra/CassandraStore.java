@@ -405,53 +405,48 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public RowMutator<T> set(final T column, final String value)
-				throws Exception {
+		public RowMutator<T> set(final T column, final String value) {
 			clm.putColumn(column, value, ttl);
 			return this;
 		}
 
 		@Override
-		public RowMutator<T> set(final T column, final double value)
-				throws Exception {
+		public RowMutator<T> set(final T column, final double value) {
 			clm.putColumn(column, value, ttl);
 			return this;
 		}
 
 		@Override
-		public RowMutator<T> set(final T column, final ByteBuffer value)
-				throws Exception {
+		public RowMutator<T> set(final T column, final ByteBuffer value) {
 			clm.putColumn(column, value, ttl);
 			return this;
 		}
 
 		@Override
-		public RowMutator<T> set(final T column, final int value)
-				throws Exception {
+		public RowMutator<T> set(final T column, final int value) {
 			clm.putColumn(column, value, ttl);
 			return this;
 		}
 
 		@Override
-		public RowMutator<T> set(final T column, final long value)
-				throws Exception {
+		public RowMutator<T> set(final T column, final long value) {
 			clm.putColumn(column, value, ttl);
 			return this;
 		}
 
 		@Override
-		public RowMutator<T> ttl(final Integer ttl) throws Exception {
+		public RowMutator<T> ttl(final Integer ttl) {
 			this.ttl = ttl;
 			return this;
 		}
 
 		@Override
-		public void delete() throws Exception {
+		public void delete() {
 			clm.delete();
 		}
 
 		@Override
-		public RowMutator<T> remove(final T column) throws Exception {
+		public RowMutator<T> remove(final T column) {
 			clm.deleteColumn(column);
 			return this;
 		}
@@ -552,15 +547,14 @@ public class CassandraStore implements StoreService {
 
 		private MutationBatch m = null;
 
-		CassandraBatchMutator(final MutationBatch m,
-				final ConsistencyLevel level_) {
+		CassandraBatchMutator(final MutationBatch m, final ConsistencyLevel level_) {
 			this.m = m;
 			this.m.setConsistencyLevel(level_);
 		}
 
 		@Override
 		public <R extends Comparable<R>, C extends Comparable<C>, V> RowMutator<C> row(final Table<R, C, V> table,
-				final R key) throws Exception {
+				final R key) {
 			return new CassandraRowMutator<C>(m.withRow(new ColumnFamily<R, C>(table.name(),
 					serializerFor(table.rowType()), serializerFor(table.columnType())), key));
 		}
@@ -617,7 +611,7 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private static final class StoreColumnImpl<T> implements StoreColumn<T> {
+	private static final class StoreColumnImpl<T extends Comparable<T>> implements StoreColumn<T> {
 
 		private final Column<T> column;
 
@@ -631,7 +625,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public String getString() throws Exception {
+		public String getString() {
 			if (!column.hasValue()) {
 				return null;
 			}
@@ -639,7 +633,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Double getDouble() throws Exception {
+		public Double getDouble() {
 			if (!column.hasValue()) {
 				return null;
 			}
@@ -647,7 +641,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Integer getInt() throws Exception {
+		public Integer getInt() {
 			if (!column.hasValue()) {
 				return null;
 			}
@@ -655,7 +649,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Long getLong() throws Exception {
+		public Long getLong() {
 			if (!column.hasValue()) {
 				return null;
 			}
@@ -663,7 +657,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Boolean getBoolean() throws Exception {
+		public Boolean getBoolean() {
 			if (!column.hasValue()) {
 				return null;
 			}
@@ -671,7 +665,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Date getDate() throws Exception {
+		public Date getDate() {
 			if (!column.hasValue()) {
 				return null;
 			}
@@ -679,7 +673,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public ByteBuffer getBlob() throws Exception {
+		public ByteBuffer getBlob() {
 			if (!column.hasValue()) {
 				return null;
 			}
@@ -687,8 +681,13 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public long getTimestamp() throws Exception {
+		public long getTimestamp() {
 			return column.getTimestamp();
+		}
+
+		@Override
+		public int compareTo(final StoreColumn<T> that) {
+			return getName().compareTo(that.getName());
 		}
 	}
 
