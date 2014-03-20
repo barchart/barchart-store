@@ -737,6 +737,15 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
+		public ObservableQueryBuilder<R, C> reverse(final boolean reversed_) {
+			if (columnRange == null) {
+				columnRange = new RangeBuilder();
+			}
+			columnRange.setReversed(reversed_);
+			return this;
+		}
+
+		@Override
 		public ObservableQueryBuilder<R, C> start(final C column) {
 			if (columnRange == null) {
 				columnRange = new RangeBuilder();

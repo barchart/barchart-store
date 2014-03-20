@@ -18,19 +18,27 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 	protected NavigableSet<C> columns = null;
 	protected C start = null;
 	protected C end = null;
-	protected int first = 0;
-	protected int last = 0;
+	protected int limit = 0;
+	protected boolean reversed = false;
 	protected String prefix = null;
 
 	@Override
-	public ObservableQueryBuilder<R, C> first(final int limit) {
-		first = limit;
+	public ObservableQueryBuilder<R, C> first(final int limit_) {
+		limit = limit_;
+		reversed = false;
 		return this;
 	}
 
 	@Override
-	public ObservableQueryBuilder<R, C> last(final int limit) {
-		last = limit;
+	public ObservableQueryBuilder<R, C> last(final int limit_) {
+		limit = limit_;
+		reversed = true;
+		return this;
+	}
+
+	@Override
+	public ObservableQueryBuilder<R, C> reverse(final boolean reversed_) {
+		reversed = reversed_;
 		return this;
 	}
 
@@ -71,9 +79,6 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 		private List<C> selectedColumns() {
 
 			final List<C> selected = new ArrayList<C>();
-
-			final boolean reversed = last > 0;
-			final int limit = last > 0 ? last : first;
 
 			NavigableSet<C> range = row.unsafeColumns();
 

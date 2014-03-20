@@ -12,9 +12,15 @@ public interface ObservableQueryBuilder<R extends Comparable<R>, C extends Compa
 	ObservableQueryBuilder<R, C> first(int limit);
 
 	/**
-	 * Return only the last <limit> columns for each row.
+	 * Return only the last <limit> columns for each row. This implicitly calls
+	 * reverse().
 	 */
 	ObservableQueryBuilder<R, C> last(int limit);
+
+	/**
+	 * Reverse the order columns are returned in.
+	 */
+	ObservableQueryBuilder<R, C> reverse(boolean reversed);
 
 	// Column range start/end by named columns
 
