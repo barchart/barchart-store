@@ -7,7 +7,7 @@ import java.util.Date;
 import com.barchart.store.api.StoreColumn;
 import com.google.common.base.Charsets;
 
-class HeapColumn<K> implements StoreColumn<K> {
+class HeapColumn<K extends Comparable<K>> implements StoreColumn<K> {
 
 	private static final Charset UTF8 = Charsets.UTF_8;
 
@@ -15,6 +15,7 @@ class HeapColumn<K> implements StoreColumn<K> {
 
 	private ByteBuffer data = null;
 	private long timestamp = 0;
+	private int ttl = 0;
 
 	public HeapColumn(final K name_) {
 		name = name_;
@@ -122,7 +123,7 @@ class HeapColumn<K> implements StoreColumn<K> {
 	}
 
 	@Override
-	public String getString() throws Exception {
+	public String getString() {
 		if (data == null) {
 			return null;
 		}
@@ -132,7 +133,7 @@ class HeapColumn<K> implements StoreColumn<K> {
 	}
 
 	@Override
-	public Double getDouble() throws Exception {
+	public Double getDouble() {
 		if (data == null) {
 			return null;
 		}
@@ -142,7 +143,7 @@ class HeapColumn<K> implements StoreColumn<K> {
 	}
 
 	@Override
-	public Integer getInt() throws Exception {
+	public Integer getInt() {
 		if (data == null) {
 			return null;
 		}
@@ -152,7 +153,7 @@ class HeapColumn<K> implements StoreColumn<K> {
 	}
 
 	@Override
-	public Long getLong() throws Exception {
+	public Long getLong() {
 		if (data == null) {
 			return null;
 		}
@@ -162,12 +163,12 @@ class HeapColumn<K> implements StoreColumn<K> {
 	}
 
 	@Override
-	public long getTimestamp() throws Exception {
+	public long getTimestamp() {
 		return timestamp;
 	}
 
 	@Override
-	public Boolean getBoolean() throws Exception {
+	public Boolean getBoolean() {
 		if (data == null) {
 			return null;
 		}
@@ -177,7 +178,7 @@ class HeapColumn<K> implements StoreColumn<K> {
 	}
 
 	@Override
-	public Date getDate() throws Exception {
+	public Date getDate() {
 		if (data == null) {
 			return null;
 		}
@@ -185,13 +186,27 @@ class HeapColumn<K> implements StoreColumn<K> {
 	}
 
 	@Override
-	public ByteBuffer getBlob() throws Exception {
+	public ByteBuffer getBlob() {
 		final ByteBuffer clone = ByteBuffer.allocate(data.capacity());
 		data.rewind();
 		clone.put(data);
 		data.rewind();
 		clone.flip();
 		return clone;
+	}
+
+	public HeapColumn<K> ttl(final int ttl_) {
+		ttl = ttl_;
+		return this;
+	}
+
+	public int ttl() {
+		return ttl;
+	}
+
+	@Override
+	public int compareTo(final StoreColumn<K> that) {
+		return name.compareTo(that.getName());
 	}
 
 }

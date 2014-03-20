@@ -4,9 +4,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
-import java.util.SortedSet;
+import java.util.NavigableSet;
+import java.util.TreeSet;
 
 import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.StoreColumn;
@@ -15,7 +15,7 @@ import com.barchart.store.api.StoreRow;
 public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Comparable<C>> implements
 		ObservableQueryBuilder<R, C> {
 
-	protected Collection<C> columns = null;
+	protected NavigableSet<C> columns = null;
 	protected C start = null;
 	protected C end = null;
 	protected int first = 0;
@@ -54,84 +54,94 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 
 	@Override
 	public ObservableQueryBuilder<R, C> columns(final C... columns_) {
-		columns = new ArrayList<C>(Arrays.asList(columns_));
+		columns = new TreeSet<C>(Arrays.asList(columns_));
 		return this;
 	}
 
 	protected class RowFilter implements StoreRow<R, C> {
 
 		private final HeapRow<R, C> row;
-		private final List<C> availColumns;
+		private final List<C> visible;
 
 		public RowFilter(final HeapRow<R, C> row_) {
 			row = row_;
-			availColumns = new ArrayList<C>();
-			buildColumnList();
+			visible = selectedColumns();
 		}
 
-		private void buildColumnList() {
+		private List<C> selectedColumns() {
 
-			if (first > 0) {
+			final List<C> selected = new ArrayList<C>();
 
-				int index = 0;
-				final Iterator<C> iter = row.columns().iterator();
+			final boolean reversed = last > 0;
+			final int limit = last > 0 ? last : first;
 
-				while (iter.hasNext() && index < first) {
-					availColumns.add(iter.next());
-					index++;
-				}
+			NavigableSet<C> range = row.unsafeColumns();
 
-			} else if (last > 0) {
+			// Filter by ranges
 
-				int index = 0;
-				final int offset = row.columns().size() - last;
-				final Iterator<C> iter = row.columns().iterator();
+			if (start != null && end != null) {
+				range = range.subSet(start, true, end, true);
+			} else if (start != null) {
+				range = range.tailSet(start, true);
+			} else if (end != null) {
+				range = range.headSet(end, true);
+			}
 
-				while (iter.hasNext()) {
-					if (index < offset) {
-						index++;
-						iter.next();
-						continue;
-					}
-					availColumns.add(iter.next());
-				}
+			if (columns != null && columns.size() > 0) {
+				range = range.subSet(columns.first(), true, columns.last(), true);
+			}
 
-			} else if (start != null || end != null) {
+			// Reverse set if needed
 
-				final SortedSet<C> rc = row.columnsImpl();
-				if (start == null) {
-					start = rc.first();
-				} else if (end == null) {
-					end = rc.last();
-				}
+			if (reversed) {
+				range = range.descendingSet();
+			}
 
-				availColumns.addAll(rc.subSet(start, end));
-				// subSet is tail-exclusive
-				if (rc.contains(end)) {
-					availColumns.add(end);
-				}
+			// Filter current range by column selector
 
+			ColumnSelector<C> selector;
+			if (columns != null && columns.size() > 0) {
+				selector = new NameSelector<C>(columns);
 			} else if (prefix != null) {
-
-				final Iterator<C> iter = row.columns().iterator();
-
-				while (iter.hasNext()) {
-					final C name = iter.next();
-					if (name.toString().startsWith(prefix)) {
-						availColumns.add(name);
-					}
-				}
-
-			} else if (columns != null) {
-
-				columns.retainAll(row.columns());
-				availColumns.addAll(columns);
-
+				selector = new PrefixSelector<C>(prefix);
 			} else {
+				selector = new AllSelector<C>();
+			}
 
-				availColumns.addAll(row.columns());
+			// Limit number of columns returned
+
+			int found = 0;
+			final long now = System.currentTimeMillis();
+
+			for (final C col : range) {
+
+				// Filter by column selector
+				if (selector.select(col)) {
+
+					if (limit == 0 || found < limit) {
+
+						final HeapColumn<C> hc = row.getImpl(col);
+
+						// Check for column expiration
+						if (hc.ttl() == 0 || hc.getTimestamp() + (hc.ttl() * 1000) > now) {
+
+							selected.add(col);
+							found++;
+
+						} else {
+
+							// Expired, remove
+							row.delete(col);
+
+						}
+
+					}
+
+				}
 
 			}
+
+			return selected;
 
 		}
 
@@ -142,19 +152,19 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 
 		@Override
 		public Collection<C> columns() {
-			return Collections.unmodifiableCollection(availColumns);
+			return Collections.unmodifiableCollection(visible);
 		}
 
 		@Override
 		public StoreColumn<C> getByIndex(final int index) {
 
-			if (availColumns.size() > 0) {
+			if (visible.size() > 0) {
 
-				if (index > availColumns.size() - 1) {
+				if (index > visible.size() - 1) {
 					throw new ArrayIndexOutOfBoundsException();
 				}
 
-				return row.get(availColumns.get(index));
+				return row.get(visible.get(index));
 
 			} else {
 				return row.getByIndex(index);
@@ -164,7 +174,7 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 
 		@Override
 		public StoreColumn<C> get(final C name) {
-			if (availColumns.size() == 0 || availColumns.contains(name)) {
+			if (visible.size() == 0 || visible.contains(name)) {
 				return row.get(name);
 			}
 			return null;
@@ -173,6 +183,51 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 		@Override
 		public int compareTo(final StoreRow<R, C> o) {
 			return getKey().compareTo(o.getKey());
+		}
+
+	}
+
+	private static interface ColumnSelector<C extends Comparable<C>> {
+
+		boolean select(C name);
+
+	}
+
+	private static final class PrefixSelector<C extends Comparable<C>> implements ColumnSelector<C> {
+
+		private final String prefix;
+
+		PrefixSelector(final String prefix_) {
+			prefix = prefix_;
+		}
+
+		@Override
+		public boolean select(final C name) {
+			return name.toString().startsWith(prefix);
+		}
+
+	}
+
+	private static final class NameSelector<C extends Comparable<C>> implements ColumnSelector<C> {
+
+		private final Collection<C> names;
+
+		NameSelector(final Collection<C> names_) {
+			names = names_;
+		}
+
+		@Override
+		public boolean select(final C name) {
+			return names.contains(name);
+		}
+
+	}
+
+	private static final class AllSelector<C extends Comparable<C>> implements ColumnSelector<C> {
+
+		@Override
+		public boolean select(final C name) {
+			return true;
 		}
 
 	}

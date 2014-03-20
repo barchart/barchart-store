@@ -102,7 +102,7 @@ public class HeapDatabase {
 
 		@Override
 		public <R extends Comparable<R>, C extends Comparable<C>, V> RowMutator<C> row(final Table<R, C, V> table,
-				final R key) throws Exception {
+				final R key) {
 			final HeapRowMutator<R, C> mutator = get(table).mutator(key);
 			mutators.add(mutator);
 			return mutator;

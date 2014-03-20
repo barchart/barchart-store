@@ -15,6 +15,8 @@ public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> im
 	protected final Set<HeapColumn<K>> update;
 	protected final Set<K> remove;
 
+	private int ttl = 0;
+
 	private boolean delete = false;
 
 	public HeapRowMutator(final HeapTable<R, K, ?> table_, final R key_) {
@@ -25,52 +27,49 @@ public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> im
 	}
 
 	@Override
-	public RowMutator<K> set(final K column, final String value)
-			throws Exception {
-		update.add(new HeapColumn<K>(column, value));
+	public RowMutator<K> set(final K column, final String value) {
+		update.add(new HeapColumn<K>(column, value).ttl(ttl));
 		return this;
 	}
 
 	@Override
-	public RowMutator<K> set(final K column, final double value)
-			throws Exception {
-		update.add(new HeapColumn<K>(column, value));
+	public RowMutator<K> set(final K column, final double value) {
+		update.add(new HeapColumn<K>(column, value).ttl(ttl));
 		return this;
 	}
 
 	@Override
-	public RowMutator<K> set(final K column, final int value) throws Exception {
-		update.add(new HeapColumn<K>(column, value));
+	public RowMutator<K> set(final K column, final int value) {
+		update.add(new HeapColumn<K>(column, value).ttl(ttl));
 		return this;
 	}
 
 	@Override
-	public RowMutator<K> set(final K column, final long value) throws Exception {
-		update.add(new HeapColumn<K>(column, value));
+	public RowMutator<K> set(final K column, final long value) {
+		update.add(new HeapColumn<K>(column, value).ttl(ttl));
 		return this;
 	}
 
 	@Override
-	public RowMutator<K> set(final K column, final ByteBuffer value)
-			throws Exception {
-		update.add(new HeapColumn<K>(column, value));
+	public RowMutator<K> set(final K column, final ByteBuffer value) {
+		update.add(new HeapColumn<K>(column, value).ttl(ttl));
 		return null;
 	}
 
 	@Override
-	public RowMutator<K> ttl(final Integer ttl) throws Exception {
-		// TODO Implement TTL for individual columns
+	public RowMutator<K> ttl(final Integer ttl_) {
+		ttl = ttl_;
 		return this;
 	}
 
 	@Override
-	public RowMutator<K> remove(final K column) throws Exception {
+	public RowMutator<K> remove(final K column) {
 		remove.add(column);
 		return this;
 	}
 
 	@Override
-	public void delete() throws Exception {
+	public void delete() {
 		delete = true;
 	}
 
@@ -87,6 +86,7 @@ public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> im
 
 			if (row == null) {
 				// Force UUID to use time-based comparator for columns
+				// TODO make alternate column comparators part of the Table API
 				if (table.definition().columnType() == UUID.class) {
 					row = new HeapRow<R, K>(key, (Comparator<K>) HeapStore.UUID_COMPARATOR);
 				} else {

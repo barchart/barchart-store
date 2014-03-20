@@ -251,6 +251,41 @@ public class TestHeapStore {
 	}
 
 	@Test
+	public void testTTL() throws Exception {
+
+		store.create(KEYSPACE, TABLE);
+		Thread.sleep(100);
+
+		final Batch batch = store.batch(KEYSPACE);
+		batch.row(TABLE, "test-1")
+				.set("name", "value")
+				.ttl(1)
+				.set("name2", "value2");
+		batch.commit();
+
+		Thread.sleep(100);
+
+		store.fetch(KEYSPACE, TABLE, "test-1").build().subscribe(observer);
+
+		assertEquals(null, observer.sync().error);
+		assertEquals(1, observer.results.size());
+		assertEquals(2, observer.results.get(0).columns().size());
+		assertEquals("value", observer.results.get(0).get("name").getString());
+		assertEquals("value2", observer.results.get(0).get("name2").getString());
+
+		Thread.sleep(1000);
+
+		store.fetch(KEYSPACE, TABLE, "test-1").build().subscribe(observer.reset());
+
+		assertEquals(null, observer.sync().error);
+		assertEquals(1, observer.results.size());
+		assertEquals(1, observer.results.get(0).columns().size());
+		assertEquals("value", observer.results.get(0).get("name").getString());
+		assertEquals(null, observer.results.get(0).get("name2"));
+
+	}
+
+	@Test
 	public void testIndexQuery() throws Exception {
 
 		store.create(KEYSPACE, Table.builder(TABLE.name())

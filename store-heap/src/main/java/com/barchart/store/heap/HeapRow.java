@@ -4,7 +4,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.SortedSet;
+import java.util.NavigableSet;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -31,8 +31,8 @@ public class HeapRow<R extends Comparable<R>, C extends Comparable<C>> implement
 		return key;
 	}
 
-	protected SortedSet<C> columnsImpl() {
-		return Collections.unmodifiableSortedSet(columns.keySet());
+	protected NavigableSet<C> unsafeColumns() {
+		return columns.keySet();
 	}
 
 	@Override
