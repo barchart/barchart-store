@@ -10,11 +10,11 @@ import rx.Observable;
  * Usage examples:
  *
  * <pre>
- * // Create a database
+ * // Create a database/keyspace
  * store.create("database");
  *
- * // Create a table
- * Table<String,String> test = Table.make("test");
+ * // Create a table (definition is typically cached/static)
+ * Table<String, String, String> test = Table.builder("test").build();
  * store.create("database", test);
  *
  * // Update some data
