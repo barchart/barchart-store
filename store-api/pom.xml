@@ -11,7 +11,7 @@
 
 	<groupId>com.barchart.store</groupId>
 	<artifactId>store-api</artifactId>
-	<version>4.0.5-SNAPSHOT</version>
+	<version>4.0.5</version>
 	<packaging>bundle</packaging>
 
 	<description>
@@ -26,7 +26,7 @@ API for key/value data store access
 		<url>https://github.com/barchart/barchart-store</url>
 		<connection>scm:git:git://github.com/barchart/barchart-store.git</connection>
 		<developerConnection>scm:git:ssh://git@github.com/barchart/barchart-store.git</developerConnection>
-		<tag>master</tag>
+		<tag>store-api-4.0.5</tag>
 	</scm>
 
 	<properties>
