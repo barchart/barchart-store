@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -93,6 +95,9 @@ public class CassandraStore implements StoreService {
 	private String password = "cassandra";
 
 	private final ExecutorService executor;
+
+	private final ConcurrentMap<Table<?, ?, ?>, ColumnFamily<?, ?>> columnFamilies =
+			new ConcurrentHashMap<Table<?, ?, ?>, ColumnFamily<?, ?>>();
 
 	private AstyanaxContext<Cluster> clusterContext = null;
 
@@ -241,27 +246,19 @@ public class CassandraStore implements StoreService {
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void create(final String keyspace,
 			final Table<R, C, V> table) throws ConnectionException {
-		clusterContext
-				.getClient()
-				.getKeyspace(keyspace)
-				.createColumnFamily(
-						new ColumnFamily<R, C>(table.name(),
-								serializerFor(table.rowType()),
-								serializerFor(table.columnType())),
-						getCFOptions(table));
+
+		clusterContext.getClient().getKeyspace(keyspace)
+				.createColumnFamily(columnFamily(table), getCFOptions(table));
+
 	}
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void update(final String keyspace,
 			final Table<R, C, V> table) throws Exception {
-		clusterContext
-				.getClient()
-				.getKeyspace(keyspace)
-				.updateColumnFamily(
-						new ColumnFamily<R, C>(table.name(),
-								serializerFor(table.rowType()),
-								serializerFor(table.columnType())),
-						getCFOptions(table));
+
+		clusterContext.getClient().getKeyspace(keyspace)
+				.updateColumnFamily(columnFamily(table), getCFOptions(table));
+
 	}
 
 	@Override
@@ -372,7 +369,6 @@ public class CassandraStore implements StoreService {
 
 			}
 
-
 			builder.put("column_metadata", cols);
 
 		}
@@ -397,11 +393,14 @@ public class CassandraStore implements StoreService {
 
 	private static class CassandraRowMutator<T> implements RowMutator<T> {
 
-		private Integer ttl = null;
-		private ColumnListMutation<T> clm = null;
+		private final CassandraBatchMutator batch;
+		private final ColumnListMutation<T> clm;
 
-		CassandraRowMutator(final ColumnListMutation<T> clm) {
-			this.clm = clm;
+		private Integer ttl = null;
+
+		CassandraRowMutator(final CassandraBatchMutator batch_, final ColumnListMutation<T> clm_) {
+			batch = batch_;
+			clm = clm_;
 		}
 
 		@Override
@@ -441,8 +440,9 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public void delete() {
+		public CassandraBatchMutator delete() {
 			clm.delete();
+			return batch;
 		}
 
 		@Override
@@ -451,12 +451,22 @@ public class CassandraStore implements StoreService {
 			return this;
 		}
 
+		@Override
+		public <R extends Comparable<R>, C extends Comparable<C>, V> RowMutator<C> row(final Table<R, C, V> table,
+				final R key) {
+			return batch.row(table, key);
+		}
+
+		@Override
+		public void commit() throws Exception {
+			batch.commit();
+		}
+
 	}
 
 	@Override
 	public Batch batch(final String keyspace) throws Exception {
-		return new CassandraBatchMutator(clusterContext.getClient()
-				.getKeyspace(keyspace).prepareMutationBatch(), writeConsistency);
+		return new CassandraBatchMutator(clusterContext.getClient().getKeyspace(keyspace));
 	}
 
 	@Override
@@ -543,25 +553,43 @@ public class CassandraStore implements StoreService {
 		return new CassandraSearchQuery<R, C>(database, table, readConsistency, executor);
 	}
 
-	private static class CassandraBatchMutator implements Batch {
+	@SuppressWarnings("unchecked")
+	private <R extends Comparable<R>, C extends Comparable<C>> ColumnFamily<R, C> columnFamily(
+			final Table<R, C, ?> table) {
 
-		private MutationBatch m = null;
+		ColumnFamily<?, ?> cf = columnFamilies.get(table);
 
-		CassandraBatchMutator(final MutationBatch m, final ConsistencyLevel level_) {
-			this.m = m;
-			this.m.setConsistencyLevel(level_);
+		if (cf == null) {
+
+			cf = new ColumnFamily<R, C>(table.name(),
+					serializerFor(table.rowType()),
+					serializerFor(table.columnType()));
+
+			columnFamilies.putIfAbsent(table, cf);
+
+		}
+
+		return (ColumnFamily<R, C>) cf;
+
+	}
+
+	private class CassandraBatchMutator implements Batch {
+
+		private MutationBatch batch = null;
+
+		CassandraBatchMutator(final Keyspace keyspace) {
+			batch = keyspace.prepareMutationBatch().withConsistencyLevel(writeConsistency);
 		}
 
 		@Override
 		public <R extends Comparable<R>, C extends Comparable<C>, V> RowMutator<C> row(final Table<R, C, V> table,
 				final R key) {
-			return new CassandraRowMutator<C>(m.withRow(new ColumnFamily<R, C>(table.name(),
-					serializerFor(table.rowType()), serializerFor(table.columnType())), key));
+			return new CassandraRowMutator<C>(this, batch.withRow(columnFamily(table), key));
 		}
 
 		@Override
 		public void commit() throws Exception {
-			m.execute();
+			batch.execute();
 		}
 
 	}
@@ -707,12 +735,7 @@ public class CassandraStore implements StoreService {
 
 			keyspace = clusterContext.getClient().getKeyspace(database_);
 
-			query =
-					keyspace.prepareQuery(
-							new ColumnFamily<R, C>(table_.name(),
-									serializerFor(table_.rowType()),
-									serializerFor(table_.columnType())))
-							.setConsistencyLevel(level_);
+			query = keyspace.prepareQuery(columnFamily(table_)).setConsistencyLevel(level_);
 
 			executor = executor_;
 
@@ -733,6 +756,15 @@ public class CassandraStore implements StoreService {
 				columnRange = new RangeBuilder();
 			}
 			columnRange.setReversed(true).setLimit(limit);
+			return this;
+		}
+
+		@Override
+		public ObservableQueryBuilder<R, C> limit(final int limit) {
+			if (columnRange == null) {
+				columnRange = new RangeBuilder();
+			}
+			columnRange.setLimit(limit);
 			return this;
 		}
 

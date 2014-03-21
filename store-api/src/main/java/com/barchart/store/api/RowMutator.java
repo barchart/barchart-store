@@ -8,7 +8,7 @@ import java.nio.ByteBuffer;
  * @param <T>
  *            The column key type for this row
  */
-public interface RowMutator<T> {
+public interface RowMutator<T> extends Batch {
 
 	/**
 	 * Set a string column value.
@@ -41,13 +41,14 @@ public interface RowMutator<T> {
 	RowMutator<T> remove(T column);
 
 	/**
-	 * Set the time-to-live in seconds for all subsequent value set() calls.
+	 * Set the time-to-live in seconds for all subsequent value set() calls on
+	 * this row.
 	 */
 	RowMutator<T> ttl(Integer ttl);
 
 	/**
 	 * Delete this row.
 	 */
-	void delete();
+	Batch delete();
 
 }

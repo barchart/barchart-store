@@ -48,6 +48,13 @@ Cassandra data store implementation and OSGI components
 		</dependency>
 
 		<dependency>
+			<groupId>com.barchart.store</groupId>
+			<artifactId>store-util</artifactId>
+			<version>[3-SNAPSHOT,4-SNAPSHOT)</version>
+			<scope>test</scope>
+		</dependency>
+
+		<dependency>
 			<groupId>com.barchart.util</groupId>
 			<artifactId>barchart-util-test</artifactId>
 			<scope>test</scope>

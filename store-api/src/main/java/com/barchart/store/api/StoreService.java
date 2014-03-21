@@ -6,9 +6,9 @@ import rx.Observable;
  * Data store interface for persisting key/value data of various types. Built to
  * support the typical features of modern distributed key/value stores
  * (Cassandra, Dynamo, Voldemort, Riak, etc).
- *
+ * 
  * Usage examples:
- *
+ * 
  * <pre>
  * // Create a database/keyspace
  * store.create("database");
@@ -49,7 +49,8 @@ import rx.Observable;
  *
  * // Fetch last 5 columns in a row (useful with ordered wide rows)
  * store.fetch("database", test, "row-key")
- *      .last(5)
+ *      .reverse(true)
+ *      .limit(5)
  *      .build().subscribe(observer);
  *
  * // Query rows based on secondary indexes

@@ -62,9 +62,9 @@ public class TestHeapStore {
 		store.create(KEYSPACE, TABLE);
 		Thread.sleep(100);
 
-		Batch batch = store.batch(KEYSPACE);
-		batch.row(TABLE, "test-1").set("column_key", "column_value");
-		batch.commit();
+		store.batch(KEYSPACE)
+				.row(TABLE, "test-1").set("column_key", "column_value")
+				.commit();
 
 		Thread.sleep(100);
 
@@ -75,10 +75,10 @@ public class TestHeapStore {
 		assertEquals(observer.results.get(0).get("column_key").getString(),
 				"column_value");
 
-		batch = store.batch(KEYSPACE);
-		batch.row(TABLE, "test-2").set("column_key", "column_value2");
-		batch.row(TABLE, "test-3").set("column_key", "column_value3");
-		batch.commit();
+		store.batch(KEYSPACE)
+				.row(TABLE, "test-2").set("column_key", "column_value2")
+				.row(TABLE, "test-3").set("column_key", "column_value3")
+				.commit();
 
 		Thread.sleep(100);
 
@@ -142,7 +142,7 @@ public class TestHeapStore {
 
 		Thread.sleep(100);
 
-		store.fetch(KEYSPACE, TABLE, "test-1").first(1).build()
+		store.fetch(KEYSPACE, TABLE, "test-1").limit(1).build()
 				.subscribe(observer);
 
 		StoreRow<String, String> row = observer.sync().results.get(0);
@@ -150,7 +150,7 @@ public class TestHeapStore {
 		assertEquals("field1", row.columns().iterator().next());
 		assertEquals("value1", row.get("field1").getString());
 
-		store.fetch(KEYSPACE, TABLE, "test-1").last(1).build()
+		store.fetch(KEYSPACE, TABLE, "test-1").reverse(true).limit(1).build()
 				.subscribe(observer.reset());
 
 		row = observer.sync().results.get(0);

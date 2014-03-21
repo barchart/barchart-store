@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.barchart.store.api.Batch;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.Table;
@@ -23,8 +24,8 @@ public class HeapTable<R extends Comparable<R>, C extends Comparable<C>, V> {
 		columns = new HashMap<C, Table.Column<C>>();
 	}
 
-	protected HeapRowMutator<R, C> mutator(final R key) {
-		return new HeapRowMutator<R, C>(this, key);
+	protected HeapRowMutator<R, C> mutator(final Batch batch, final R key) {
+		return new HeapRowMutator<R, C>(this, batch, key);
 	}
 
 	public ObservableQueryBuilder<R, C> fetch(final R... keys)

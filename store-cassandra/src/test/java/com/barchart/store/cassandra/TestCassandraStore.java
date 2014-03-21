@@ -19,10 +19,10 @@ import com.barchart.store.api.ObservableIndexQueryBuilder.Operator;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreRow;
 import com.barchart.store.api.Table;
+import com.barchart.store.util.UUIDUtil;
 import com.barchart.util.test.concurrent.CallableTest;
 import com.barchart.util.test.concurrent.TestObserver;
 import com.netflix.astyanax.model.ConsistencyLevel;
-import com.netflix.astyanax.util.TimeUUIDUtils;
 
 // Low entropy, run manually on functional updates
 @Ignore
@@ -112,9 +112,9 @@ public class TestCassandraStore {
 	@Test
 	public void testInsert() throws Exception {
 
-		Batch batch = store.batch(KEYSPACE);
-		batch.row(DEFAULT_TABLE, "test-1").set("column_key", "column_value");
-		batch.commit();
+		store.batch(KEYSPACE)
+				.row(DEFAULT_TABLE, "test-1").set("column_key", "column_value")
+				.commit();
 
 		Thread.sleep(100);
 
@@ -125,10 +125,10 @@ public class TestCassandraStore {
 		assertEquals(observer.results.get(0).get("column_key").getString(),
 				"column_value");
 
-		batch = store.batch(KEYSPACE);
-		batch.row(DEFAULT_TABLE, "test-2").set("column_key", "column_value2");
-		batch.row(DEFAULT_TABLE, "test-3").set("column_key", "column_value3");
-		batch.commit();
+		store.batch(KEYSPACE)
+				.row(DEFAULT_TABLE, "test-2").set("column_key", "column_value2")
+				.row(DEFAULT_TABLE, "test-3").set("column_key", "column_value3")
+				.commit();
 
 		Thread.sleep(100);
 
@@ -153,7 +153,7 @@ public class TestCassandraStore {
 	@Test
 	public void testUUID() throws Exception {
 
-		final UUID uuid = TimeUUIDUtils.getUniqueTimeUUIDinMillis();
+		final UUID uuid = UUIDUtil.timeUUID();
 
 		final Batch batch = store.batch(KEYSPACE);
 		batch.row(UUID_COL_TABLE, "test-1").set(uuid, "column_value");
@@ -235,7 +235,7 @@ public class TestCassandraStore {
 
 		Thread.sleep(100);
 
-		store.fetch(KEYSPACE, DEFAULT_TABLE, "test-1").first(1).build()
+		store.fetch(KEYSPACE, DEFAULT_TABLE, "test-1").limit(1).build()
 				.subscribe(observer);
 
 		StoreRow<String, String> row = observer.sync().results.get(0);
@@ -243,7 +243,7 @@ public class TestCassandraStore {
 		assertEquals("field1", row.columns().iterator().next());
 		assertEquals("value1", row.get("field1").getString());
 
-		store.fetch(KEYSPACE, DEFAULT_TABLE, "test-1").last(1).build()
+		store.fetch(KEYSPACE, DEFAULT_TABLE, "test-1").reverse(true).limit(1).build()
 				.subscribe(observer.reset());
 
 		row = observer.sync().results.get(0);

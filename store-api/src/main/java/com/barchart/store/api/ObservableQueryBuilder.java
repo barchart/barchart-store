@@ -4,25 +4,32 @@ import rx.Observable;
 
 public interface ObservableQueryBuilder<R extends Comparable<R>, C extends Comparable<C>> {
 
-	// Max number of columns to return
-
 	/**
-	 * Return only the first <limit> columns for each row.
+	 * Return only the first <i>limit</i> columns for each row.
+	 *
+	 * @deprecated Use ObservableQueryBuilder#limit(limit)
 	 */
+	@Deprecated
 	ObservableQueryBuilder<R, C> first(int limit);
 
 	/**
-	 * Return only the last <limit> columns for each row. This implicitly calls
-	 * reverse().
+	 * Return only the last <i>limit</i> columns for each row. This implicitly
+	 * returns columns in descending order.
+	 *
+	 * @deprecated Use ObservableQueryBuilder#reverse(true).limit(limit)
 	 */
+	@Deprecated
 	ObservableQueryBuilder<R, C> last(int limit);
+
+	/**
+	 * Return only the first <i>limit</i> columns for each row.
+	 */
+	ObservableQueryBuilder<R, C> limit(int limit);
 
 	/**
 	 * Reverse the order columns are returned in.
 	 */
 	ObservableQueryBuilder<R, C> reverse(boolean reversed);
-
-	// Column range start/end by named columns
 
 	/**
 	 * Return a range of columns in comparator order, starting with the named

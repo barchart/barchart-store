@@ -37,6 +37,12 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 	}
 
 	@Override
+	public ObservableQueryBuilder<R, C> limit(final int limit_) {
+		limit = limit_;
+		return this;
+	}
+
+	@Override
 	public ObservableQueryBuilder<R, C> reverse(final boolean reversed_) {
 		reversed = reversed_;
 		return this;

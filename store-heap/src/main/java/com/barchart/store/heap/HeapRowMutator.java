@@ -6,11 +6,14 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import com.barchart.store.api.Batch;
 import com.barchart.store.api.RowMutator;
+import com.barchart.store.api.Table;
 
 public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> implements RowMutator<K> {
 
 	protected final HeapTable<R, K, ?> table;
+	protected final Batch batch;
 	protected final R key;
 	protected final Set<HeapColumn<K>> update;
 	protected final Set<K> remove;
@@ -19,8 +22,9 @@ public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> im
 
 	private boolean delete = false;
 
-	public HeapRowMutator(final HeapTable<R, K, ?> table_, final R key_) {
+	public HeapRowMutator(final HeapTable<R, K, ?> table_, final Batch batch_, final R key_) {
 		table = table_;
+		batch = batch_;
 		key = key_;
 		update = new HashSet<HeapColumn<K>>();
 		remove = new HashSet<K>();
@@ -69,8 +73,20 @@ public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> im
 	}
 
 	@Override
-	public void delete() {
+	public Batch delete() {
 		delete = true;
+		return batch;
+	}
+
+	@Override
+	public <S extends Comparable<S>, C extends Comparable<C>, V> RowMutator<C> row(final Table<S, C, V> table,
+			final S key) {
+		return batch.row(table, key);
+	}
+
+	@Override
+	public void commit() throws Exception {
+		batch.commit();
 	}
 
 	@SuppressWarnings("unchecked")
