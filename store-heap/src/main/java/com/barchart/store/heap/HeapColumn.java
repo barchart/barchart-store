@@ -7,7 +7,7 @@ import java.util.Date;
 import com.barchart.store.api.StoreColumn;
 import com.google.common.base.Charsets;
 
-class HeapColumn<K extends Comparable<K>> implements StoreColumn<K> {
+public class HeapColumn<K extends Comparable<K>> implements StoreColumn<K> {
 
 	private static final Charset UTF8 = Charsets.UTF_8;
 
