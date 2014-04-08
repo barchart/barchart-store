@@ -1,7 +1,6 @@
 package com.barchart.store.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.util.UUID;
 
@@ -10,7 +9,7 @@ import org.junit.Test;
 public class TimeUUIDComparatorTest {
 
 	@Test
-	public void test() throws Exception {
+	public void testMSB() throws Exception {
 
 		final TimeUUIDComparator cmp = new TimeUUIDComparator();
 
@@ -22,6 +21,22 @@ public class TimeUUIDComparatorTest {
 		assertTrue(second.getMostSignificantBits() < 0);
 
 		assertEquals(1, first.compareTo(second));
+		assertEquals(-1, cmp.compare(first, second));
+
+	}
+
+	@Test
+	public void testSequence() throws Exception {
+
+		final TimeUUIDComparator cmp = new TimeUUIDComparator();
+
+		final long now = System.currentTimeMillis();
+
+		final UUID first = UUIDUtil.timeUUID(now);
+		final UUID second = UUIDUtil.timeUUID(now);
+
+		assertNotEquals(first, second);
+
 		assertEquals(-1, cmp.compare(first, second));
 
 	}

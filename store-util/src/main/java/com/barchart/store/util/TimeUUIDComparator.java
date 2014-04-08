@@ -15,7 +15,13 @@ public class TimeUUIDComparator implements Comparator<UUID> {
 		final long t1 = u1.timestamp();
 		final long t2 = u2.timestamp();
 
-		return t1 < t2 ? -1 : (t1 == t2 ? 0 : 1);
+		if (t1 != t2)
+			return t1 < t2 ? -1 : 1;
+
+		final long s1 = u1.clockSequence();
+		final long s2 = u2.clockSequence();
+
+		return s1 < s2 ? -1 : (s1 == s2 ? 0 : 1);
 
 	}
 
