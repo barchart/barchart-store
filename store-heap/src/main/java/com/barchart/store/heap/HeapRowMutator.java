@@ -57,7 +57,7 @@ public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> im
 	@Override
 	public RowMutator<K> set(final K column, final ByteBuffer value) {
 		update.add(new HeapColumn<K>(column, value).ttl(ttl));
-		return null;
+		return this;
 	}
 
 	@Override
