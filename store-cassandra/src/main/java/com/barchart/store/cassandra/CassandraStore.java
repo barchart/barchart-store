@@ -11,9 +11,10 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import rx.Observable;
@@ -91,10 +92,13 @@ public class CassandraStore implements StoreService {
 	private ConsistencyLevel readConsistency = ConsistencyLevel.CL_ONE;
 	private ConsistencyLevel writeConsistency = ConsistencyLevel.CL_ONE;
 
+	private int maxConns = 100;
+	private int maxConnsPerHost = 50;
+
 	private String user = "cassandra";
 	private String password = "cassandra";
 
-	private final ExecutorService executor;
+	private final ThreadPoolExecutor executor;
 
 	private final ConcurrentMap<Table<?, ?, ?>, ColumnFamily<?, ?>> columnFamilies =
 			new ConcurrentHashMap<Table<?, ?, ?>, ColumnFamily<?, ?>>();
@@ -102,11 +106,8 @@ public class CassandraStore implements StoreService {
 	private AstyanaxContext<Cluster> clusterContext = null;
 
 	public CassandraStore() {
-		this(Executors.newCachedThreadPool(new DaemonFactory()));
-	}
-
-	public CassandraStore(final ExecutorService executor) {
-		this.executor = executor;
+		executor = new ThreadPoolExecutor(10, maxConns, 60, TimeUnit.SECONDS,
+				new LinkedBlockingQueue<Runnable>(), new DaemonFactory());
 	}
 
 	public void setSeeds(final String... seeds_) {
@@ -127,6 +128,24 @@ public class CassandraStore implements StoreService {
 
 	public void setReplicationFactor(final int factor_) {
 		replicationFactor = factor_;
+	}
+
+	/**
+	 * This should be tuned in conjunction with setMaxConnectionsPerHost() to
+	 * ensure that the number of connections is not greater than (hosts x
+	 * maxConnsPerHost) for your cluster. If it is, you may encounter pool
+	 * timeouts during heavy use.
+	 */
+	public void setMaxConnections(final int max_) {
+		maxConns = max_;
+		executor.setMaximumPoolSize(maxConns);
+	}
+
+	/**
+	 * The maximum number of connections to open to each cluster node.
+	 */
+	public void setMaxConnectionsPerHost(final int max_) {
+		maxConnsPerHost = max_;
 	}
 
 	public void setReadConsistency(final ConsistencyLevel level_) {
@@ -163,8 +182,8 @@ public class CassandraStore implements StoreService {
 								new ConnectionPoolConfigurationImpl(
 										"barchart_pool")
 										.setSeeds(Joiner.on(",").join(seeds))
-										.setMaxConns(100)
-										.setMaxConnsPerHost(10)
+										.setMaxConns(maxConns)
+										.setMaxConnsPerHost(maxConnsPerHost)
 										.setConnectTimeout(10000)
 										.setSocketTimeout(10000)
 										.setMaxTimeoutCount(10)
@@ -874,43 +893,42 @@ public class CassandraStore implements StoreService {
 				rowQuery.withColumnRange(columnRange.build());
 			}
 
-			return Observable
-					.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
+			return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
+
+				@Override
+				public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
+
+					// Cassandra doesn't really do async well
+					// final
+					// ListenableFuture<OperationResult<ColumnList<T>>>
+					// future = rowQuery.executeAsync();
+
+					executor.execute(new Runnable() {
 
 						@Override
-						public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
-
-							// Cassandra doesn't really do async well
-							// final
-							// ListenableFuture<OperationResult<ColumnList<T>>>
-							// future = rowQuery.executeAsync();
-
-							executor.execute(new Runnable() {
-
-								@Override
-								public void run() {
-									try {
-										final OperationResult<ColumnList<C>> result = rowQuery.execute();
-										final ColumnList<C> columns = result.getResult();
-										observer.onNext(wrapColumns(key, columns));
-										observer.onCompleted();
-									} catch (final Exception e) {
-										observer.onError(e);
-									}
-								}
-
-							});
-
-							return new Subscription() {
-								@Override
-								public void unsubscribe() {
-									// No-op, single item query
-								}
-							};
-
+						public void run() {
+							try {
+								final OperationResult<ColumnList<C>> result = rowQuery.execute();
+								final ColumnList<C> columns = result.getResult();
+								observer.onNext(wrapColumns(key, columns));
+								observer.onCompleted();
+							} catch (final Exception e) {
+								observer.onError(e);
+							}
 						}
 
 					});
+
+					return new Subscription() {
+						@Override
+						public void unsubscribe() {
+							// No-op, single item query
+						}
+					};
+
+				}
+
+			});
 
 		}
 
@@ -958,46 +976,45 @@ public class CassandraStore implements StoreService {
 				rowQuery.withColumnRange(columnRange.build());
 			}
 
-			return Observable
-					.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
+			return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
 
-						private volatile boolean complete = false;
+				private volatile boolean complete = false;
+
+				@Override
+				public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
+
+					executor.execute(new Runnable() {
 
 						@Override
-						public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
-
-							executor.execute(new Runnable() {
-
-								@Override
-								public void run() {
-									try {
-										final OperationResult<Rows<R, C>> result = rowQuery.execute();
-										int ct = 0;
-										for (final Row<R, C> row : result.getResult()) {
-											if (complete || (limit > 0 && ct >= limit)) {
-												break;
-											}
-											ct++;
-											observer.onNext(wrapRow(row));
-										}
-										observer.onCompleted();
-									} catch (final Exception e) {
-										observer.onError(e);
+						public void run() {
+							try {
+								final OperationResult<Rows<R, C>> result = rowQuery.execute();
+								int ct = 0;
+								for (final Row<R, C> row : result.getResult()) {
+									if (complete || (limit > 0 && ct >= limit)) {
+										break;
 									}
+									ct++;
+									observer.onNext(wrapRow(row));
 								}
-
-							});
-
-							return new Subscription() {
-								@Override
-								public void unsubscribe() {
-									complete = true;
-								}
-							};
-
+								observer.onCompleted();
+							} catch (final Exception e) {
+								observer.onError(e);
+							}
 						}
 
 					});
+
+					return new Subscription() {
+						@Override
+						public void unsubscribe() {
+							complete = true;
+						}
+					};
+
+				}
+
+			});
 
 		}
 
@@ -1046,48 +1063,47 @@ public class CassandraStore implements StoreService {
 				rowQuery.setRowLimit(batchSize);
 			}
 
-			return Observable
-					.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
+			return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
 
-						private volatile boolean complete = false;
+				private volatile boolean complete = false;
+
+				@Override
+				public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
+
+					executor.execute(new Runnable() {
 
 						@Override
-						public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
+						public void run() {
+							try {
 
-							executor.execute(new Runnable() {
+								final OperationResult<Rows<R, C>> result = rowQuery.execute();
 
-								@Override
-								public void run() {
-									try {
-
-										final OperationResult<Rows<R, C>> result = rowQuery.execute();
-
-										int ct = 0;
-										for (final Row<R, C> row : result.getResult()) {
-											if (complete || (limit > 0 && ct >= limit)) {
-												break;
-											}
-											observer.onNext(wrapRow(row));
-											ct++;
-										}
-										observer.onCompleted();
-									} catch (final Exception e) {
-										observer.onError(e);
+								int ct = 0;
+								for (final Row<R, C> row : result.getResult()) {
+									if (complete || (limit > 0 && ct >= limit)) {
+										break;
 									}
+									observer.onNext(wrapRow(row));
+									ct++;
 								}
-
-							});
-
-							return new Subscription() {
-								@Override
-								public void unsubscribe() {
-									complete = true;
-								}
-							};
-
+								observer.onCompleted();
+							} catch (final Exception e) {
+								observer.onError(e);
+							}
 						}
 
 					});
+
+					return new Subscription() {
+						@Override
+						public void unsubscribe() {
+							complete = true;
+						}
+					};
+
+				}
+
+			});
 
 		}
 	}
