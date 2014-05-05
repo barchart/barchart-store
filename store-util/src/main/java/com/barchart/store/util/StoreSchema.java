@@ -13,6 +13,10 @@ public abstract class StoreSchema {
 	 */
 	protected abstract Table<?, ?, ?>[] tables();
 
+	/**
+	 * Compare the schema with the remote database and update if needed. Not
+	 * recommended for unattended running on production data sets.
+	 */
 	public void update(final StoreService store, final String database)
 			throws Exception {
 
@@ -28,6 +32,26 @@ public abstract class StoreSchema {
 			} else {
 				store.update(database, table);
 			}
+		}
+
+	}
+
+	/**
+	 * Truncate all tables in the current schema to reset the database.
+	 */
+	public void truncate(final StoreService store, final String database)
+			throws Exception {
+
+		if (store.has(database)) {
+
+			final Table<?, ?, ?>[] tables = tables();
+
+			for (final Table<?, ?, ?> table : tables) {
+				if (store.has(database, table)) {
+					store.truncate(database, table);
+				}
+			}
+
 		}
 
 	}
