@@ -169,17 +169,11 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 		@Override
 		public StoreColumn<C> getByIndex(final int index) {
 
-			if (visible.size() > 0) {
-
-				if (index > visible.size() - 1) {
-					throw new ArrayIndexOutOfBoundsException();
-				}
-
+			if (visible.size() > 0 && index < visible.size()) {
 				return row.get(visible.get(index));
-
-			} else {
-				return row.getByIndex(index);
 			}
+
+			throw new ArrayIndexOutOfBoundsException();
 
 		}
 
