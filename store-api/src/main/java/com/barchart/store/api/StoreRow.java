@@ -30,4 +30,9 @@ public interface StoreRow<R extends Comparable<R>, C extends Comparable<C>> exte
 	 */
 	public StoreColumn<C> get(C name);
 
+	/**
+	 * Get the number of columns in this row result.
+	 */
+	public int size();
+
 }

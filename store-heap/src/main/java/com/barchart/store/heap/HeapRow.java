@@ -91,4 +91,9 @@ public class HeapRow<R extends Comparable<R>, C extends Comparable<C>> implement
 		return key.compareTo(o.getKey());
 	}
 
+	@Override
+	public int size() {
+		return columns.size();
+	}
+
 }

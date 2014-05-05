@@ -618,9 +618,13 @@ public class CassandraStore implements StoreService {
 		private final R key;
 		private final ColumnList<C> columns;
 
+		private List<C> names = null;
+
 		StoreRowImpl(final R key_, final ColumnList<C> columns_) {
+
 			key = key_;
 			columns = columns_;
+
 		}
 
 		@Override
@@ -630,7 +634,21 @@ public class CassandraStore implements StoreService {
 
 		@Override
 		public Collection<C> columns() {
-			return columns.getColumnNames();
+
+			// Astyanax/Thrift just stores these as unordered HashMap keys,
+			// but we want the order to match the indexing.
+
+			// return columns.getColumnNames();
+
+			if (names == null) {
+				names = new ArrayList<C>();
+				for (int i = 0; i < columns.size(); i++) {
+					names.add(columns.getColumnByIndex(i).getName());
+				}
+			}
+
+			return names;
+
 		}
 
 		@Override
@@ -654,6 +672,11 @@ public class CassandraStore implements StoreService {
 		@Override
 		public int compareTo(final StoreRow<R, C> o) {
 			return key.compareTo(o.getKey());
+		}
+
+		@Override
+		public int size() {
+			return columns.size();
 		}
 
 	}

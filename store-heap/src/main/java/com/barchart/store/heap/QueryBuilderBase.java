@@ -190,6 +190,11 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 			return getKey().compareTo(o.getKey());
 		}
 
+		@Override
+		public int size() {
+			return visible.size();
+		}
+
 	}
 
 	private static interface ColumnSelector<C extends Comparable<C>> {
