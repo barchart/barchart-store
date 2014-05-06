@@ -30,7 +30,7 @@ Data store utils
 	</scm>
 
 	<properties>
-		<projectJavaVersion>1.6</projectJavaVersion>
+		<projectJavaVersion>1.7</projectJavaVersion>
 	</properties>
 
 	<dependencies>

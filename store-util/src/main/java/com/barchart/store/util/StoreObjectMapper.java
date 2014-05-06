@@ -205,9 +205,8 @@ public abstract class StoreObjectMapper {
 	 * @return A lazy observable that executes on every subscribe
 	 */
 	@SafeVarargs
-	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, T>> Observable<T> findRows(
-			final Table<R, C, V> table, final Class<M> mapper,
-			final Where<C>... clauses) {
+	protected final <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, T>> Observable<T> findRows(
+			final Table<R, C, V> table, final Class<M> mapper, final Where<C>... clauses) {
 
 		try {
 
