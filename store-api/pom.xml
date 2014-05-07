@@ -11,7 +11,7 @@
 
 	<groupId>com.barchart.store</groupId>
 	<artifactId>store-api</artifactId>
-	<version>4.0.17-SNAPSHOT</version>
+	<version>4.0.18-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<description>
