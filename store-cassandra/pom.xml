@@ -11,7 +11,7 @@
 
 	<groupId>com.barchart.store</groupId>
 	<artifactId>store-cassandra</artifactId>
-	<version>5.0.8-SNAPSHOT</version>
+	<version>5.0.9-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<description>
