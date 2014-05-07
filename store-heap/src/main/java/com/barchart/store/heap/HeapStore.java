@@ -6,8 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import rx.Observable;
-import rx.Observer;
-import rx.Subscription;
+import rx.functions.Func1;
 
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
@@ -78,63 +77,16 @@ public class HeapStore implements StoreService {
 		getDatabase(database).delete(table);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> Observable<Boolean> exists(final String database,
-			final Table<R, C, V> table, final R keys) throws Exception {
+			final Table<R, C, V> table, final R key) throws Exception {
 
-		return Observable.create(new Observable.OnSubscribeFunc<Boolean>() {
+		return fetch(database, table, key).build().exists(new Func1<StoreRow<R, C>, Boolean>() {
 
 			@Override
-			public Subscription onSubscribe(
-					final Observer<? super Boolean> observer) {
-
-				try {
-
-					@SuppressWarnings("unchecked")
-					final Subscription sub =
-							fetch(database, table, keys).build().subscribe(
-									new Observer<StoreRow<R, C>>() {
-
-										@Override
-										public void onCompleted() {
-											observer.onCompleted();
-										}
-
-										@Override
-										public void onError(final Throwable e) {
-											observer.onError(e);
-										}
-
-										@Override
-										public void onNext(final StoreRow<R, C> row) {
-											if (row.columns().size() > 0) {
-												observer.onNext(true);
-											} else {
-												observer.onNext(false);
-											}
-										}
-
-									});
-
-					return new Subscription() {
-						@Override
-						public void unsubscribe() {
-							sub.unsubscribe();
-						}
-					};
-
-				} catch (final Exception e) {
-
-					observer.onError(e);
-
-					return new Subscription() {
-						@Override
-						public void unsubscribe() {
-						}
-					};
-
-				}
-
+			public Boolean call(final StoreRow<R, C> row) {
+				return row.columns().size() > 0;
 			}
 
 		});

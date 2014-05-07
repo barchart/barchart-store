@@ -72,12 +72,12 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 		return this;
 	}
 
-	protected class RowFilter implements StoreRow<R, C> {
+	protected class QueryRow implements StoreRow<R, C> {
 
 		private final HeapRow<R, C> row;
 		private final List<C> visible;
 
-		public RowFilter(final HeapRow<R, C> row_) {
+		public QueryRow(final HeapRow<R, C> row_) {
 			row = row_;
 			visible = selectedColumns();
 		}

@@ -4,7 +4,7 @@ import java.util.Comparator;
 import java.util.TreeSet;
 
 import rx.Observable;
-import rx.util.functions.Func1;
+import rx.functions.Func1;
 
 public class Functions {
 

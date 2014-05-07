@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import rx.Observable;
-import rx.Observer;
-import rx.Subscription;
+import rx.Subscriber;
+import rx.functions.Func1;
 
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
@@ -488,63 +488,16 @@ public class CassandraStore implements StoreService {
 		return new CassandraBatchMutator(clusterContext.getClient().getKeyspace(keyspace));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> Observable<Boolean> exists(final String database,
-			final Table<R, C, V> table, final R keys) throws Exception {
+			final Table<R, C, V> table, final R key) throws Exception {
 
-		return Observable.create(new Observable.OnSubscribeFunc<Boolean>() {
+		return fetch(database, table, key).build().exists(new Func1<StoreRow<R, C>, Boolean>() {
 
 			@Override
-			public Subscription onSubscribe(
-					final Observer<? super Boolean> observer) {
-
-				try {
-
-					@SuppressWarnings("unchecked")
-					final Subscription sub =
-							fetch(database, table, keys).build().subscribe(
-									new Observer<StoreRow<R, C>>() {
-
-										@Override
-										public void onCompleted() {
-											observer.onCompleted();
-										}
-
-										@Override
-										public void onError(final Throwable e) {
-											observer.onError(e);
-										}
-
-										@Override
-										public void onNext(final StoreRow<R, C> row) {
-											if (row.columns().size() > 0) {
-												observer.onNext(true);
-											} else {
-												observer.onNext(false);
-											}
-										}
-
-									});
-
-					return new Subscription() {
-						@Override
-						public void unsubscribe() {
-							sub.unsubscribe();
-						}
-					};
-
-				} catch (final Exception e) {
-
-					observer.onError(e);
-
-					return new Subscription() {
-						@Override
-						public void unsubscribe() {
-						}
-					};
-
-				}
-
+			public Boolean call(final StoreRow<R, C> row) {
+				return row.columns().size() > 0;
 			}
 
 		});
@@ -916,14 +869,13 @@ public class CassandraStore implements StoreService {
 				rowQuery.withColumnRange(columnRange.build());
 			}
 
-			return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
+			return Observable.create(new Observable.OnSubscribe<StoreRow<R, C>>() {
 
 				@Override
-				public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
+				public void call(final Subscriber<? super StoreRow<R, C>> subscriber) {
 
 					// Cassandra doesn't really do async well
-					// final
-					// ListenableFuture<OperationResult<ColumnList<T>>>
+					// final ListenableFuture<OperationResult<ColumnList<T>>>
 					// future = rowQuery.executeAsync();
 
 					executor.execute(new Runnable() {
@@ -933,21 +885,14 @@ public class CassandraStore implements StoreService {
 							try {
 								final OperationResult<ColumnList<C>> result = rowQuery.execute();
 								final ColumnList<C> columns = result.getResult();
-								observer.onNext(wrapColumns(key, columns));
-								observer.onCompleted();
+								subscriber.onNext(wrapColumns(key, columns));
+								subscriber.onCompleted();
 							} catch (final Exception e) {
-								observer.onError(e);
+								subscriber.onError(e);
 							}
 						}
 
 					});
-
-					return new Subscription() {
-						@Override
-						public void unsubscribe() {
-							// No-op, single item query
-						}
-					};
 
 				}
 
@@ -999,41 +944,46 @@ public class CassandraStore implements StoreService {
 				rowQuery.withColumnRange(columnRange.build());
 			}
 
-			return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
-
-				private volatile boolean complete = false;
+			return Observable.create(new Observable.OnSubscribe<StoreRow<R, C>>() {
 
 				@Override
-				public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
+				public void call(final Subscriber<? super StoreRow<R, C>> subscriber) {
 
 					executor.execute(new Runnable() {
 
 						@Override
 						public void run() {
+
 							try {
+
 								final OperationResult<Rows<R, C>> result = rowQuery.execute();
+
 								int ct = 0;
+
 								for (final Row<R, C> row : result.getResult()) {
-									if (complete || (limit > 0 && ct >= limit)) {
+
+									if (subscriber.isUnsubscribed()) {
+										return;
+									}
+
+									if (limit > 0 && ct >= limit) {
 										break;
 									}
+
+									subscriber.onNext(wrapRow(row));
 									ct++;
-									observer.onNext(wrapRow(row));
+
 								}
-								observer.onCompleted();
+
+								subscriber.onCompleted();
+
 							} catch (final Exception e) {
-								observer.onError(e);
+								subscriber.onError(e);
 							}
+
 						}
 
 					});
-
-					return new Subscription() {
-						@Override
-						public void unsubscribe() {
-							complete = true;
-						}
-					};
 
 				}
 
@@ -1086,43 +1036,45 @@ public class CassandraStore implements StoreService {
 				rowQuery.setRowLimit(batchSize);
 			}
 
-			return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
-
-				private volatile boolean complete = false;
+			return Observable.create(new Observable.OnSubscribe<StoreRow<R, C>>() {
 
 				@Override
-				public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
+				public void call(final Subscriber<? super StoreRow<R, C>> subscriber) {
 
 					executor.execute(new Runnable() {
 
 						@Override
 						public void run() {
+
 							try {
 
 								final OperationResult<Rows<R, C>> result = rowQuery.execute();
 
 								int ct = 0;
 								for (final Row<R, C> row : result.getResult()) {
-									if (complete || (limit > 0 && ct >= limit)) {
+
+									if (subscriber.isUnsubscribed()) {
+										return;
+									}
+
+									if (limit > 0 && ct >= limit) {
 										break;
 									}
-									observer.onNext(wrapRow(row));
+
+									subscriber.onNext(wrapRow(row));
 									ct++;
+
 								}
-								observer.onCompleted();
+
+								subscriber.onCompleted();
+
 							} catch (final Exception e) {
-								observer.onError(e);
+								subscriber.onError(e);
 							}
+
 						}
 
 					});
-
-					return new Subscription() {
-						@Override
-						public void unsubscribe() {
-							complete = true;
-						}
-					};
 
 				}
 
@@ -1257,43 +1209,46 @@ public class CassandraStore implements StoreService {
 
 			final IndexQuery<R, C> indexQuery = rowQuery;
 
-			return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
-
-				private volatile boolean complete = false;
+			return Observable.create(new Observable.OnSubscribe<StoreRow<R, C>>() {
 
 				@Override
-				public Subscription onSubscribe(final Observer<? super StoreRow<R, C>> observer) {
+				public void call(final Subscriber<? super StoreRow<R, C>> subscriber) {
 
 					executor.execute(new Runnable() {
 
 						@Override
 						public void run() {
+
 							try {
 
 								final OperationResult<Rows<R, C>> result = indexQuery.execute();
 
 								int ct = 0;
+
 								for (final Row<R, C> row : result.getResult()) {
-									if (complete || (limit > 0 && ct >= limit)) {
+
+									if (subscriber.isUnsubscribed()) {
+										return;
+									}
+
+									if (limit > 0 && ct >= limit) {
 										break;
 									}
-									observer.onNext(wrapRow(row));
+
+									subscriber.onNext(wrapRow(row));
 									ct++;
+
 								}
-								observer.onCompleted();
+
+								subscriber.onCompleted();
+
 							} catch (final Exception e) {
-								observer.onError(e);
+								subscriber.onError(e);
 							}
+
 						}
 
 					});
-
-					return new Subscription() {
-						@Override
-						public void unsubscribe() {
-							complete = true;
-						}
-					};
 
 				}
 

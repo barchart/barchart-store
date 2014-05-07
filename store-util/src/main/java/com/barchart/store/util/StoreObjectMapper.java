@@ -1,11 +1,10 @@
 package com.barchart.store.util;
 
-import java.util.Arrays;
 import java.util.List;
 
 import rx.Observable;
 import rx.Observer;
-import rx.util.functions.Func1;
+import rx.functions.Func1;
 
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
@@ -14,8 +13,20 @@ import com.barchart.store.api.ObservableQueryBuilder;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.StoreService;
 import com.barchart.store.api.Table;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public abstract class StoreObjectMapper {
+
+	static final ObjectMapper mapper = new ObjectMapper();
+	static {
+		mapper.setVisibilityChecker(mapper.getSerializationConfig()
+				.getDefaultVisibilityChecker()
+				.withFieldVisibility(JsonAutoDetect.Visibility.ANY)
+				.withGetterVisibility(JsonAutoDetect.Visibility.NONE)
+				.withSetterVisibility(JsonAutoDetect.Visibility.NONE)
+				.withCreatorVisibility(JsonAutoDetect.Visibility.NONE));
+	}
 
 	protected final StoreService store;
 	protected final String database;
@@ -55,8 +66,7 @@ public abstract class StoreObjectMapper {
 		return database;
 	}
 
-	protected <R extends Comparable<R>, C extends Comparable<C>, T, M extends RowMapper<R, C, T>> M mapper(
-			final Class<M> cls) {
+	protected <M> M mapper(final Class<M> cls) {
 		return mappers.instance(cls);
 	}
 
@@ -77,8 +87,7 @@ public abstract class StoreObjectMapper {
 			final R... keys) {
 
 		try {
-			return store.fetch(database, table, keys).build()
-					.filter(Filters.EMPTY_ROW).map(mapper(mapper));
+			return store.fetch(database, table, keys).build().lift(mapper(mapper));
 		} catch (final Exception e) {
 			return Observable.error(e);
 		}
@@ -94,7 +103,7 @@ public abstract class StoreObjectMapper {
 	 * @param columns The column names to load
 	 * @return A lazy observable that executes on every subscribe
 	 */
-	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, List<T>>> Observable<T> loadColumns(
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends ColumnListMapper<R, C, T>> Observable<T> loadColumns(
 			final Table<R, C, V> table, final Class<M> mapper, final R key, final C... columns) {
 
 		try {
@@ -106,7 +115,7 @@ public abstract class StoreObjectMapper {
 				query.columns(columns);
 			}
 
-			return query.build().filter(Filters.EMPTY_ROW).map(mapper(mapper)).mapMany(Functions.<T> each());
+			return query.build().lift(mapper(mapper));
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -124,14 +133,11 @@ public abstract class StoreObjectMapper {
 	 * @return A lazy observable that executes on every subscribe
 	 */
 	@SuppressWarnings("unchecked")
-	protected <R extends Comparable<R>, V, T, M extends RowMapper<R, String, List<T>>> Observable<T> loadColumnsByPrefix(
+	protected <R extends Comparable<R>, V, T, M extends ColumnListMapper<R, String, T>> Observable<T> loadColumnsByPrefix(
 			final Table<R, String, V> table, final Class<M> mapper, final R key, final String prefix) {
 
 		try {
-
-			return store.fetch(database, table, key).prefix(prefix).build()
-					.filter(Filters.EMPTY_ROW).map(mapper(mapper)).mapMany(Functions.<T> each());
-
+			return store.fetch(database, table, key).prefix(prefix).build().lift(mapper(mapper));
 		} catch (final Exception e) {
 			return Observable.error(e);
 		}
@@ -148,21 +154,16 @@ public abstract class StoreObjectMapper {
 	 * @param reverse Sort descending instead of ascending
 	 * @return A lazy observable that executes on every subscribe
 	 */
-	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, List<T>>> Observable<T> loadColumns(
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends ColumnListMapper<R, C, T>> Observable<T> loadColumns(
 			final Table<R, C, V> table, final Class<M> mapper, final R key, final int count, final boolean reverse) {
 
 		try {
 
-			@SuppressWarnings("unchecked")
-			final ObservableQueryBuilder<R, C> query = store.fetch(database, table, key);
-
-			if (reverse) {
-				query.last(count);
-			} else {
-				query.first(count);
-			}
-
-			return query.build().filter(Filters.EMPTY_ROW).map(mapper(mapper)).mapMany(Functions.<T> each());
+			return store.fetch(database, table, key)
+					.reverse(reverse)
+					.limit(count)
+					.build()
+					.lift(mapper(mapper));
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -182,14 +183,11 @@ public abstract class StoreObjectMapper {
 	 * @return A lazy observable that executes on every subscribe
 	 */
 	@SuppressWarnings("unchecked")
-	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, List<T>>> Observable<T> loadColumns(
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends ColumnListMapper<R, C, T>> Observable<T> loadColumns(
 			final Table<R, C, V> table, final Class<M> mapper, final R key, final C start, final C end) {
 
 		try {
-
-			return store.fetch(database, table, key).start(start).end(end).build()
-					.filter(Filters.EMPTY_ROW).map(mapper(mapper)).mapMany(Functions.<T> each());
-
+			return store.fetch(database, table, key).start(start).end(end).build().lift(mapper(mapper));
 		} catch (final Exception e) {
 			return Observable.error(e);
 		}
@@ -217,7 +215,7 @@ public abstract class StoreObjectMapper {
 				builder.where(where.field, where.value, where.operator);
 			}
 
-			return builder.build().filter(Filters.EMPTY_ROW).map(mapper(mapper));
+			return builder.build().lift(mapper(mapper));
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -238,7 +236,7 @@ public abstract class StoreObjectMapper {
 	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, U extends T, M extends RowMapper<R, C, T>> Observable<T> createRow(
 			final Table<R, C, V> table, final Class<M> mapper, final R key, final U obj) {
 
-		return cache(loadRows(table, mapper, key).isEmpty().mapMany(
+		return cache(loadRows(table, mapper, key).isEmpty().flatMap(
 				new Func1<Boolean, Observable<T>>() {
 
 					@Override
@@ -292,14 +290,17 @@ public abstract class StoreObjectMapper {
 	 * @param objects The objects to store as columns
 	 * @return A cached observable that is executed immediately
 	 */
-	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, U extends T, M extends RowMapper<R, C, List<T>>> Observable<T> updateColumns(
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, U extends T, M extends ColumnListMapper<R, C, T>> Observable<T> updateColumns(
 			final Table<R, C, V> table, final Class<M> mapper, final R key, final U... objects) {
 
 		try {
 
 			final Batch batch = store.batch(database);
 			final RowMutator<C> mutator = batch.row(table, key);
-			mapper(mapper).encode(Arrays.asList((T[]) objects), mutator);
+			final M m = mapper(mapper);
+			for (final U obj : objects) {
+				m.encode(obj, mutator);
+			}
 			batch.commit();
 
 			return Observable.<T> from(objects);

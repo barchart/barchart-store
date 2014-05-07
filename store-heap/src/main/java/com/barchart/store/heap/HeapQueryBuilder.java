@@ -1,11 +1,9 @@
 package com.barchart.store.heap;
 
 import java.util.Collection;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import rx.Observable;
-import rx.Observer;
-import rx.Subscription;
+import rx.Subscriber;
 
 import com.barchart.store.api.StoreRow;
 
@@ -25,40 +23,30 @@ public class HeapQueryBuilder<R extends Comparable<R>, C extends Comparable<C>> 
 	@Override
 	public Observable<StoreRow<R, C>> build(final int limit) {
 
-		return Observable.create(new Observable.OnSubscribeFunc<StoreRow<R, C>>() {
+		return Observable.create(new Observable.OnSubscribe<StoreRow<R, C>>() {
 
 			@Override
-			public Subscription onSubscribe(
-					final Observer<? super StoreRow<R, C>> o) {
+			public void call(final Subscriber<? super StoreRow<R, C>> subscriber) {
 
-				final AtomicBoolean running = new AtomicBoolean(true);
 				int ct = 0;
 
-				try {
+				for (final HeapRow<R, C> row : rows) {
 
-					for (final HeapRow<R, C> row : rows) {
-						if (!running.get() || (limit > 0 && ct >= limit)) {
-							o.onCompleted();
-							break;
-						}
-						o.onNext(new RowFilter(row));
-						ct++;
+					if (subscriber.isUnsubscribed()) {
+						return;
 					}
 
-					o.onCompleted();
+					if (limit > 0 && ct >= limit) {
+						subscriber.onCompleted();
+						break;
+					}
 
-				} catch (final Exception e) {
-					o.onError(e);
+					subscriber.onNext(new QueryRow(row));
+					ct++;
+
 				}
 
-				return new Subscription() {
-
-					@Override
-					public void unsubscribe() {
-						running.set(false);
-					}
-
-				};
+				subscriber.onCompleted();
 
 			}
 

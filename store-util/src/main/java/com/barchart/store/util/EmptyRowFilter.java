@@ -1,6 +1,6 @@
 package com.barchart.store.util;
 
-import rx.util.functions.Func1;
+import rx.functions.Func1;
 
 import com.barchart.store.api.StoreRow;
 

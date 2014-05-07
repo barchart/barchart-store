@@ -5,12 +5,10 @@ import java.util.concurrent.ConcurrentMap;
 
 public class MapperFactory {
 
-	private final ConcurrentMap<Class<?>, Object> instances =
-			new ConcurrentHashMap<Class<?>, Object>();
+	private final ConcurrentMap<Class<?>, Object> instances = new ConcurrentHashMap<Class<?>, Object>();
 
 	@SuppressWarnings("unchecked")
-	public <R extends Comparable<R>, C extends Comparable<C>, T, M extends RowMapper<R, C, T>> M instance(
-			final Class<M> cls) {
+	public <M> M instance(final Class<M> cls) {
 
 		if (!instances.containsKey(cls)) {
 			try {
