@@ -163,54 +163,39 @@ public class CassandraStore implements StoreService {
 
 	public void connect() {
 
-		final Builder builder =
-				new AstyanaxContext.Builder()
-						.forCluster(clusterName)
-						.withAstyanaxConfiguration(
-
-								new AstyanaxConfigurationImpl()
-										.setDiscoveryType(
-												NodeDiscoveryType.RING_DESCRIBE)
-										// https://github.com/Netflix/astyanax/issues/127
-										.setConnectionPoolType(
-												ConnectionPoolType.ROUND_ROBIN)
-										// https://github.com/Netflix/astyanax/issues/127
-										.setCqlVersion("3.0.0")
-										.setTargetCassandraVersion("1.2"))
-
-						.withConnectionPoolConfiguration(
-								new ConnectionPoolConfigurationImpl(
-										"barchart_pool")
-										.setSeeds(Joiner.on(",").join(seeds))
-										.setMaxConns(maxConns)
-										.setMaxConnsPerHost(maxConnsPerHost)
-										.setConnectTimeout(10000)
-										.setSocketTimeout(10000)
-										.setMaxTimeoutCount(10)
-
-										// MJS: Added those to solidify the
-										// connection as I get a timeout quite
-										// often
-										.setLatencyAwareUpdateInterval(10000)
-										// Will resort hosts per token partition
-										// every 10 seconds
-										.setLatencyAwareResetInterval(10000)
-										.setLatencyAwareBadnessThreshold(2)
-										.setLatencyAwareWindowSize(100)
-										// Uses last 100 latency samples. These
-										// samples are in a FIFO q and will just
-										// cycle themselves.
-										.setAuthenticationCredentials(
-												new SimpleAuthenticationCredentials(
-														this.user,
-														this.password)))
-						.withConnectionPoolMonitor(
-								new CountingConnectionPoolMonitor());
+		final Builder builder = new AstyanaxContext.Builder()
+				.forCluster(clusterName)
+				.withAstyanaxConfiguration(new AstyanaxConfigurationImpl()
+						.setDiscoveryType(NodeDiscoveryType.RING_DESCRIBE)
+						// https://github.com/Netflix/astyanax/issues/127
+						.setConnectionPoolType(ConnectionPoolType.ROUND_ROBIN)
+						// https://github.com/Netflix/astyanax/issues/127
+						.setCqlVersion("3.0.0")
+						.setTargetCassandraVersion("1.2"))
+				.withConnectionPoolConfiguration(new ConnectionPoolConfigurationImpl(
+						"barchart_pool")
+						.setSeeds(Joiner.on(",").join(seeds))
+						.setMaxConns(maxConns)
+						.setMaxConnsPerHost(maxConnsPerHost)
+						.setConnectTimeout(10000)
+						.setSocketTimeout(10000)
+						.setMaxTimeoutCount(10)
+						// Added those to solidify the connection as I get a
+						// timeout quite often
+						.setLatencyAwareUpdateInterval(10000)
+						// Resort hosts per token partition every 10 seconds
+						.setLatencyAwareResetInterval(10000)
+						.setLatencyAwareBadnessThreshold(2)
+						// Uses last 100 latency samples
+						.setLatencyAwareWindowSize(100)
+						.setAuthenticationCredentials(new SimpleAuthenticationCredentials(this.user, this.password)))
+				.withConnectionPoolMonitor(new CountingConnectionPoolMonitor());
 
 		// get cluster
-		clusterContext =
-				builder.buildCluster(ThriftFamilyFactory.getInstance());
+		clusterContext = builder.buildCluster(ThriftFamilyFactory.getInstance());
+
 		clusterContext.start();
+
 	}
 
 	public void disconnect() {
