@@ -88,8 +88,6 @@ public abstract class QueryBuilderBase<R extends Comparable<R>, C extends Compar
 
 			NavigableSet<C> range = row.unsafeColumns();
 
-			// Filter by ranges
-
 			if (start != null && end != null) {
 				range = range.subSet(start, true, end, true);
 			} else if (start != null) {

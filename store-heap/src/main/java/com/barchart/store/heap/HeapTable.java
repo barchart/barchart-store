@@ -2,9 +2,11 @@ package com.barchart.store.heap;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.barchart.store.api.Batch;
@@ -28,6 +30,7 @@ public class HeapTable<R extends Comparable<R>, C extends Comparable<C>, V> {
 		return new HeapRowMutator<R, C>(this, batch, key);
 	}
 
+	@SuppressWarnings("unchecked")
 	public ObservableQueryBuilder<R, C> fetch(final R... keys)
 			throws Exception {
 
@@ -43,7 +46,13 @@ public class HeapTable<R extends Comparable<R>, C extends Comparable<C>, V> {
 					// Per spec (and Cassandra behavior), we should always
 					// return a row for an explicitly requested key, even if it
 					// is empty
-					matches.add(new HeapRow<R, C>(key));
+					// Force UUID to use time-based comparator for columns
+					// TODO make alternate column comparators part of the Table API
+					if (table.columnType() == UUID.class) {
+						matches.add(new HeapRow<R, C>(key, (Comparator<C>) HeapStore.UUID_COMPARATOR));
+					} else {
+						matches.add(new HeapRow<R, C>(key));
+					}
 				}
 			}
 
