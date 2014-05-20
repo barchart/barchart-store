@@ -5,7 +5,7 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * An individual account permission.
+ * A value stored as a blob that can be read as any arbitrary type.
  */
 public interface DynamicTypedValue<T extends DynamicTypedValue<T>> {
 

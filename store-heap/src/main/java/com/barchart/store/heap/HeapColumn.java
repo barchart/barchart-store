@@ -187,6 +187,9 @@ public class HeapColumn<K extends Comparable<K>> implements StoreColumn<K> {
 
 	@Override
 	public ByteBuffer getBlob() {
+		if (data == null) {
+			return null;
+		}
 		final ByteBuffer clone = ByteBuffer.allocate(data.capacity());
 		data.rewind();
 		clone.put(data);
