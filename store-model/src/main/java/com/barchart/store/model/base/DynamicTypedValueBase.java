@@ -23,7 +23,7 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> extends Typed
 	@Override
 	public T set(final String value) {
 		try {
-			return set(value, STRING, value.getBytes("UTF-8").length);
+			return set(value, STRING, value == null ? 0 : value.getBytes("UTF-8").length);
 		} catch (final UnsupportedEncodingException e) {
 			throw new RuntimeException(e);
 		}
@@ -99,12 +99,12 @@ public class DynamicTypedValueBase<T extends DynamicTypedValue<T>> extends Typed
 
 	@Override
 	public T set(final Date value) {
-		return set(new DateTime(value.getTime()), DATE, 8);
+		return set(new DateTime(value == null ? 0l : value.getTime()), DATE, 8);
 	}
 
 	@Override
 	public T set(final ByteBuffer value) {
-		return set(value, BYTE_BUFFER, value.remaining());
+		return set(value, BYTE_BUFFER, value == null ? 0 : value.remaining());
 	}
 
 	@SuppressWarnings("unchecked")
