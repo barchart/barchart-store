@@ -1,7 +1,6 @@
 package com.barchart.store.model.base;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -10,6 +9,8 @@ import java.util.List;
 
 import org.junit.Before;
 import org.junit.Test;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class TestDynamicTypeValueBase {
 
@@ -83,7 +84,22 @@ public class TestDynamicTypeValueBase {
 		}, value.asBlob().array());
 	}
 
-	public class TestValue extends DynamicTypedValueBase<TestValue> {
+	@Test
+	public void testSerialize() throws Exception {
+
+		final ObjectMapper mapper = new ObjectMapper();
+
+		value.set("XXX");
+
+		final String ser = mapper.writeValueAsString(value);
+
+		final TestValue deser = mapper.readValue(ser, TestValue.class);
+
+		assertEquals("XXX", deser.asString());
+
+	}
+
+	public static class TestValue extends DynamicTypedValueBase<TestValue> {
 	}
 
 }

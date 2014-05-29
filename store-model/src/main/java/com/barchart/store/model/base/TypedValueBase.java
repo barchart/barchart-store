@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class TypedValueBase {
 
+	@JsonIgnore
 	protected final TypeCodecRegistry codecs;
 
 	protected TypedValueBase() {
@@ -20,6 +21,7 @@ public class TypedValueBase {
 	@JsonIgnore
 	protected ByteBuffer encoded;
 
+	@JsonIgnore
 	protected Object last;
 
 	@JsonProperty
