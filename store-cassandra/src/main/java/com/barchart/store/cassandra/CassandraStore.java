@@ -89,8 +89,8 @@ public class CassandraStore implements StoreService {
 			"chicago", "us-east-1"
 	};
 	private int replicationFactor = 2;
-	private ConsistencyLevel readConsistency = ConsistencyLevel.CL_ONE;
-	private ConsistencyLevel writeConsistency = ConsistencyLevel.CL_ONE;
+	private ConsistencyLevel readConsistency = ConsistencyLevel.CL_LOCAL_QUORUM;
+	private ConsistencyLevel writeConsistency = ConsistencyLevel.CL_LOCAL_QUORUM;
 
 	private int maxConns = 100;
 	private int maxConnsPerHost = 50;
