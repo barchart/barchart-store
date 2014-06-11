@@ -2,6 +2,7 @@ package com.barchart.store.cassandra;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -94,6 +95,7 @@ public class CassandraStore implements StoreService {
 
 	private int maxConns = 100;
 	private int maxConnsPerHost = 50;
+	private int maxRowSlice = 100;
 
 	private String user = "cassandra";
 	private String password = "cassandra";
@@ -146,6 +148,16 @@ public class CassandraStore implements StoreService {
 	 */
 	public void setMaxConnectionsPerHost(final int max_) {
 		maxConnsPerHost = max_;
+	}
+
+	/**
+	 * The maximum number of rows to request by key per query. Requesting too
+	 * many rows by key seems to send C* into a tailspin. If more than max_ keys
+	 * are requested by the client, they will be split into multiple queries
+	 * behind the scenes (but will look the same to the client.)
+	 */
+	public void setMaxRowSlice(final int max_) {
+		maxRowSlice = max_;
 	}
 
 	public void setReadConsistency(final ConsistencyLevel level_) {
@@ -891,8 +903,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Observable<StoreRow<R, C>> build(final int limit,
-				final int batchSize) {
+		public Observable<StoreRow<R, C>> build(final int limit, final int batchSize) {
 			return build();
 		}
 
@@ -920,14 +931,11 @@ public class CassandraStore implements StoreService {
 
 		@Override
 		public Observable<StoreRow<R, C>> build(final int limit) {
+			return build(limit, 0);
+		}
 
-			final RowSliceQuery<R, C> rowQuery = query.getKeySlice(keys);
-
-			if (columns != null) {
-				rowQuery.withColumnSlice(columns);
-			} else if (columnRange != null) {
-				rowQuery.withColumnRange(columnRange.build());
-			}
+		@Override
+		public Observable<StoreRow<R, C>> build(final int limit, final int batchSize) {
 
 			return Observable.create(new Observable.OnSubscribe<StoreRow<R, C>>() {
 
@@ -941,22 +949,38 @@ public class CassandraStore implements StoreService {
 
 							try {
 
-								final OperationResult<Rows<R, C>> result = rowQuery.execute();
-
 								int ct = 0;
 
-								for (final Row<R, C> row : result.getResult()) {
+								final int realBatchSize =
+										batchSize == 0 ? maxRowSlice : Math.min(batchSize, maxRowSlice);
 
-									if (subscriber.isUnsubscribed()) {
-										return;
+								outer:
+								for (final R[] batch : batches(keys, realBatchSize)) {
+
+									final RowSliceQuery<R, C> rowQuery = query.getKeySlice(batch);
+
+									if (columns != null) {
+										rowQuery.withColumnSlice(columns);
+									} else if (columnRange != null) {
+										rowQuery.withColumnRange(columnRange.build());
 									}
 
-									if (limit > 0 && ct >= limit) {
-										break;
-									}
+									final OperationResult<Rows<R, C>> result = rowQuery.execute();
 
-									subscriber.onNext(wrapRow(row));
-									ct++;
+									for (final Row<R, C> row : result.getResult()) {
+
+										if (subscriber.isUnsubscribed()) {
+											return;
+										}
+
+										if (limit > 0 && ct >= limit) {
+											break outer;
+										}
+
+										subscriber.onNext(wrapRow(row));
+										ct++;
+
+									}
 
 								}
 
@@ -976,10 +1000,29 @@ public class CassandraStore implements StoreService {
 
 		}
 
-		@Override
-		public Observable<StoreRow<R, C>> build(final int limit,
-				final int batchSize) {
-			return build(limit);
+		/**
+		 * Slice a key set into multiple batches.
+		 */
+		private <T> List<T[]> batches(final T[] keys, final int batchSize) {
+
+			final ArrayList<T[]> batches = new ArrayList<T[]>();
+
+			if (batchSize == 0 || keys.length <= batchSize) {
+				batches.add(keys);
+			} else {
+
+				int idx = 0;
+
+				while (idx <= keys.length) {
+					final int end = idx + batchSize > keys.length ? keys.length : idx + batchSize;
+					batches.add(Arrays.copyOfRange(keys, idx, end));
+					idx += batchSize;
+				}
+
+			}
+
+			return batches;
+
 		}
 
 	}
@@ -1006,8 +1049,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Observable<StoreRow<R, C>> build(final int limit,
-				final int batchSize) {
+		public Observable<StoreRow<R, C>> build(final int limit, final int batchSize) {
 
 			final AllRowsQuery<R, C> rowQuery = query.getAllRows();
 
@@ -1116,8 +1158,7 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public Observable<StoreRow<R, C>> build(final int limit,
-				final int batchSize) {
+		public Observable<StoreRow<R, C>> build(final int limit, final int batchSize) {
 
 			IndexQuery<R, C> rowQuery = query.searchWithIndex();
 
