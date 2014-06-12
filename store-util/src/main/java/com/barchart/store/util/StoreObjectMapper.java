@@ -1,5 +1,7 @@
 package com.barchart.store.util;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import rx.Observable;
@@ -404,6 +406,57 @@ public abstract class StoreObjectMapper {
 		});
 
 		return cached;
+
+	}
+
+	/**
+	 * Split a set of objects into batches and run a task over each batch. This
+	 * should be used extensively when requesting objects over multiple rows,
+	 * since unbounded multi-get queries can kill a cluster very quickly.
+	 *
+	 * http://www.datastax.com/documentation/cassandra/1.2/cassandra/
+	 * architecture/architecturePlanningAntiPatterns_c.html?scroll=
+	 * concept_ds_emm_hwl_fk__multiple-gets
+	 */
+	protected static <T, K> Observable<T> batch(final Func1<K[], Observable<T>> task, final K[] params,
+			final int batchSize) {
+
+		if (params.length <= batchSize) {
+			return task.call(params);
+		}
+
+		final List<Observable<T>> results = new ArrayList<Observable<T>>();
+
+		for (final K[] slice : slice(params, batchSize)) {
+			results.add(task.call(slice));
+		}
+
+		return Observable.mergeDelayError(Observable.from(results));
+
+	}
+
+	/**
+	 * Slice a key set into multiple batches.
+	 */
+	protected static <T> List<T[]> slice(final T[] keys, final int batchSize) {
+
+		final ArrayList<T[]> batches = new ArrayList<T[]>();
+
+		if (batchSize == 0 || keys.length <= batchSize) {
+			batches.add(keys);
+		} else {
+
+			int idx = 0;
+
+			while (idx <= keys.length) {
+				final int end = idx + batchSize > keys.length ? keys.length : idx + batchSize;
+				batches.add(Arrays.copyOfRange(keys, idx, end));
+				idx += batchSize;
+			}
+
+		}
+
+		return batches;
 
 	}
 
