@@ -498,7 +498,7 @@ public abstract class StoreObjectMapper {
 
 			int idx = 0;
 
-			while (idx <= keys.length) {
+			while (idx < keys.length) {
 				final int end = idx + batchSize > keys.length ? keys.length : idx + batchSize;
 				batches.add(Arrays.copyOfRange(keys, idx, end));
 				idx += batchSize;
