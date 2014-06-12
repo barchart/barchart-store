@@ -34,6 +34,9 @@ public abstract class StoreObjectMapper {
 	protected final String database;
 	protected final StoreSchema schema;
 
+	private int maxReadBatch = 100;
+	private int maxWriteBatch = 100;
+
 	private final MapperFactory mappers;
 
 	public StoreObjectMapper(final StoreService store_, final String database_,
@@ -45,6 +48,35 @@ public abstract class StoreObjectMapper {
 
 		mappers = new MapperFactory();
 
+	}
+
+	/**
+	 * Set the maximum batch size for row read queries to prevent unbounded
+	 * multi-gets.
+	 */
+	public void maxReadBatch(final int size) {
+		maxReadBatch = size;
+	}
+
+	/**
+	 * The maximum batch size for row read queries. Default 100.
+	 */
+	public int maxReadBatch() {
+		return maxReadBatch;
+	}
+
+	/**
+	 * Set the maximum batch size for row updates to limit memory consumption.
+	 */
+	public void maxWriteBatch(final int size) {
+		maxWriteBatch = size;
+	}
+
+	/**
+	 * The maximum batch size for row updates. Default 100.
+	 */
+	public int maxWriteBatch() {
+		return maxWriteBatch;
 	}
 
 	/**
@@ -88,11 +120,20 @@ public abstract class StoreObjectMapper {
 			final Table<R, C, V> table, final Class<M> mapper,
 			final R... keys) {
 
-		try {
-			return store.fetch(database, table, keys).build().lift(mapper(mapper));
-		} catch (final Exception e) {
-			return Observable.error(e);
-		}
+		return batch(new Func1<R[], Observable<T>>() {
+
+			@Override
+			public Observable<T> call(final R[] slice) {
+
+				try {
+					return store.fetch(database, table, slice).build().lift(mapper(mapper));
+				} catch (final Exception e) {
+					return Observable.error(e);
+				}
+
+			}
+
+		}, keys, maxReadBatch);
 
 	}
 
@@ -323,19 +364,28 @@ public abstract class StoreObjectMapper {
 	protected <R extends Comparable<R>, C extends Comparable<C>, V> Observable<R> deleteRows(
 			final Table<R, C, V> table, final R... keys) {
 
-		try {
+		return batch(new Func1<R[], Observable<R>>() {
 
-			final Batch batch = store.batch(database);
-			for (final R key : keys) {
-				batch.row(table, key).delete();
+			@Override
+			public Observable<R> call(final R[] slice) {
+
+				try {
+
+					final Batch batch = store.batch(database);
+					for (final R key : slice) {
+						batch.row(table, key).delete();
+					}
+					batch.commit();
+
+					return Observable.from(slice);
+
+				} catch (final Exception e) {
+					return Observable.error(e);
+				}
+
 			}
-			batch.commit();
 
-			return Observable.from(keys);
-
-		} catch (final Exception e) {
-			return Observable.error(e);
-		}
+		}, keys, maxWriteBatch);
 
 	}
 
