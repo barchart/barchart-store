@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import rx.Observable;
+
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.ObservableIndexQueryBuilder;
 import com.barchart.store.api.ObservableQueryBuilder;
@@ -109,10 +111,20 @@ public class HeapDatabase {
 		}
 
 		@Override
-		public void commit() throws Exception {
-			for (final HeapRowMutator<?, ?> mutator : mutators) {
-				mutator.apply();
+		public Observable<Boolean> commit() {
+
+			try {
+
+				for (final HeapRowMutator<?, ?> mutator : mutators) {
+					mutator.apply();
+				}
+
+				return Observable.empty();
+
+			} catch (final Throwable t) {
+				return Observable.error(t);
 			}
+
 		}
 
 	}

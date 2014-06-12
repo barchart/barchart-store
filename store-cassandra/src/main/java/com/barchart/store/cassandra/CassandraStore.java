@@ -474,8 +474,8 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public void commit() throws Exception {
-			batch.commit();
+		public Observable<Boolean> commit() {
+			return batch.commit();
 		}
 
 	}
@@ -557,8 +557,37 @@ public class CassandraStore implements StoreService {
 		}
 
 		@Override
-		public void commit() throws Exception {
-			batch.execute();
+		public Observable<Boolean> commit() {
+
+			// Create a cached Observable for one-time execution
+			final Observable<Boolean> obs = Observable.create(new Observable.OnSubscribe<Boolean>() {
+
+				@Override
+				public void call(final Subscriber<? super Boolean> subscriber) {
+
+					executor.execute(new Runnable() {
+
+						@Override
+						public void run() {
+							try {
+								batch.execute();
+								subscriber.onCompleted();
+							} catch (final Exception e) {
+								subscriber.onError(e);
+							}
+						}
+
+					});
+
+				}
+
+			}).cache();
+
+			// Force subscription for immediate execution
+			obs.subscribe();
+
+			return obs;
+
 		}
 
 	}

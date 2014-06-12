@@ -1,5 +1,6 @@
 package com.barchart.store.api;
 
+import rx.Observable;
 
 /**
  * Fluent interface for updating rows in the data store.
@@ -14,6 +15,6 @@ public interface Batch {
 	/**
 	 * Commit all row operations from row() calls.
 	 */
-	void commit() throws Exception;
+	Observable<Boolean> commit();
 
 }

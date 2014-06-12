@@ -6,6 +6,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
+import rx.Observable;
+
 import com.barchart.store.api.Batch;
 import com.barchart.store.api.RowMutator;
 import com.barchart.store.api.Table;
@@ -85,8 +87,8 @@ public class HeapRowMutator<R extends Comparable<R>, K extends Comparable<K>> im
 	}
 
 	@Override
-	public void commit() throws Exception {
-		batch.commit();
+	public Observable<Boolean> commit() {
+		return batch.commit();
 	}
 
 	@SuppressWarnings("unchecked")
