@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
@@ -17,6 +18,10 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import rx.Observable;
 import rx.Subscriber;
@@ -76,6 +81,8 @@ import com.netflix.astyanax.util.RangeBuilder;
 
 public class CassandraStore implements StoreService {
 
+	private final Logger log = LoggerFactory.getLogger(getClass());
+
 	private String[] seeds = new String[] {
 			"eqx02.chicago.b.cassandra.eqx.barchart.com",
 			"eqx01.chicago.b.cassandra.eqx.barchart.com",
@@ -101,6 +108,10 @@ public class CassandraStore implements StoreService {
 	private String password = "cassandra";
 
 	private final ThreadPoolExecutor executor;
+	private final BlockingQueue<Runnable> executorQueue;
+
+	private final AtomicLong queryCount = new AtomicLong(1);
+	private final AtomicInteger concurrentQueries = new AtomicInteger(0);
 
 	private final ConcurrentMap<Table<?, ?, ?>, ColumnFamily<?, ?>> columnFamilies =
 			new ConcurrentHashMap<Table<?, ?, ?>, ColumnFamily<?, ?>>();
@@ -108,8 +119,8 @@ public class CassandraStore implements StoreService {
 	private AstyanaxContext<Cluster> clusterContext = null;
 
 	public CassandraStore() {
-		executor = new ThreadPoolExecutor(10, maxConns, 60, TimeUnit.SECONDS,
-				new LinkedBlockingQueue<Runnable>(), new DaemonFactory());
+		executorQueue = new LinkedBlockingQueue<Runnable>();
+		executor = new ThreadPoolExecutor(maxConns, maxConns, 60, TimeUnit.SECONDS, executorQueue, new DaemonFactory());
 	}
 
 	public void setSeeds(final String... seeds_) {
@@ -139,8 +150,14 @@ public class CassandraStore implements StoreService {
 	 * timeouts during heavy use.
 	 */
 	public void setMaxConnections(final int max_) {
+		if (max_ < maxConns) {
+			executor.setCorePoolSize(max_);
+			executor.setMaximumPoolSize(max_);
+		} else {
+			executor.setMaximumPoolSize(max_);
+			executor.setCorePoolSize(max_);
+		}
 		maxConns = max_;
-		executor.setMaximumPoolSize(maxConns);
 	}
 
 	/**
@@ -189,9 +206,15 @@ public class CassandraStore implements StoreService {
 						.setSeeds(Joiner.on(",").join(seeds))
 						.setMaxConns(maxConns)
 						.setMaxConnsPerHost(maxConnsPerHost)
-						.setConnectTimeout(10000)
+						.setConnectTimeout(5000)
 						.setSocketTimeout(10000)
 						.setMaxTimeoutCount(10)
+						// This is not a network timeout, but a connection pool
+						// timeout if all connections are in use. In theory this
+						// should not ever happen since our Executor has the
+						// same number of threads as the connection pool, but it
+						// still does.
+						.setMaxTimeoutWhenExhausted(30000)
 						// Added those to solidify the connection as I get a
 						// timeout quite often
 						.setLatencyAwareUpdateInterval(10000)
@@ -542,6 +565,54 @@ public class CassandraStore implements StoreService {
 
 	}
 
+	private volatile long lastConnectionWarning = 0;
+
+	private <R> long queryStart(final String label, final R... keys) {
+
+		if (log.isDebugEnabled() && executorQueue.size() > 0) {
+			final long now = System.currentTimeMillis();
+			if (now - lastConnectionWarning > 10000) {
+				lastConnectionWarning = now;
+				log.debug("Executor pool is full (" + maxConns + " threads). While this is "
+						+ "not necessarily a problem, you should verify pool configuration "
+						+ "if latency becomes an issue.");
+			}
+		}
+
+		if (log.isTraceEnabled()) {
+
+			final long qct = queryCount.getAndIncrement();
+			final int conc = concurrentQueries.incrementAndGet();
+
+			log.trace("START " + qct + " (" + Thread.currentThread().getName() + ", " + conc + " executing): " + label
+					+ "=[" + Joiner.on(", ").join(keys) + "]");
+
+			return qct;
+
+		}
+
+		return 0;
+
+	}
+
+	private void queryFinish(final long query, final int rows) {
+
+		if (log.isTraceEnabled()) {
+			log.trace("FINISH " + query + " (" + Thread.currentThread().getName() + "): " + rows + " rows");
+			concurrentQueries.decrementAndGet();
+		}
+
+	}
+
+	private void queryFailed(final long query, final Exception e) {
+
+		if (log.isTraceEnabled()) {
+			log.trace("FAILED " + query + " (" + Thread.currentThread().getName() + ")", e);
+			concurrentQueries.decrementAndGet();
+		}
+
+	}
+
 	private class CassandraBatchMutator implements Batch {
 
 		private MutationBatch batch = null;
@@ -569,12 +640,25 @@ public class CassandraStore implements StoreService {
 
 						@Override
 						public void run() {
+
+							final long qct = queryStart("commit");
+
 							try {
+
 								batch.execute();
+
+								queryFinish(qct, 0);
+
 								subscriber.onCompleted();
+
 							} catch (final Exception e) {
+
+								queryFailed(qct, e);
+
 								subscriber.onError(e);
+
 							}
+
 						}
 
 					});
@@ -900,21 +984,32 @@ public class CassandraStore implements StoreService {
 				@Override
 				public void call(final Subscriber<? super StoreRow<R, C>> subscriber) {
 
-					// Cassandra doesn't really do async well
-					// final ListenableFuture<OperationResult<ColumnList<T>>>
-					// future = rowQuery.executeAsync();
-
 					executor.execute(new Runnable() {
 
 						@Override
 						public void run() {
+
+							long qct = 0;
+
 							try {
+
+								qct = queryStart("keys");
+
 								final OperationResult<ColumnList<C>> result = rowQuery.execute();
+
+								queryFinish(qct, result.getResult().size());
+
 								final ColumnList<C> columns = result.getResult();
 								subscriber.onNext(wrapColumns(key, columns));
+
 								subscriber.onCompleted();
+
 							} catch (final Exception e) {
+
+								queryFailed(qct, e);
+
 								subscriber.onError(e);
+
 							}
 						}
 
@@ -976,6 +1071,8 @@ public class CassandraStore implements StoreService {
 						@Override
 						public void run() {
 
+							long qct = 0;
+
 							try {
 
 								int ct = 0;
@@ -994,7 +1091,11 @@ public class CassandraStore implements StoreService {
 										rowQuery.withColumnRange(columnRange.build());
 									}
 
+									qct = queryStart("keys");
+
 									final OperationResult<Rows<R, C>> result = rowQuery.execute();
+
+									queryFinish(qct, result.getResult().size());
 
 									for (final Row<R, C> row : result.getResult()) {
 
@@ -1016,7 +1117,11 @@ public class CassandraStore implements StoreService {
 								subscriber.onCompleted();
 
 							} catch (final Exception e) {
+
+								queryFailed(qct, e);
+
 								subscriber.onError(e);
+
 							}
 
 						}
@@ -1102,9 +1207,15 @@ public class CassandraStore implements StoreService {
 						@Override
 						public void run() {
 
+							long qct = 0;
+
 							try {
 
+								qct = queryStart("keys");
+
 								final OperationResult<Rows<R, C>> result = rowQuery.execute();
+
+								queryFinish(qct, result.getResult().size());
 
 								int ct = 0;
 								for (final Row<R, C> row : result.getResult()) {
@@ -1125,7 +1236,11 @@ public class CassandraStore implements StoreService {
 								subscriber.onCompleted();
 
 							} catch (final Exception e) {
+
+								queryFailed(qct, e);
+
 								subscriber.onError(e);
+
 							}
 
 						}
@@ -1274,9 +1389,15 @@ public class CassandraStore implements StoreService {
 						@Override
 						public void run() {
 
+							long qct = 0;
+
 							try {
 
+								qct = queryStart("search");
+
 								final OperationResult<Rows<R, C>> result = indexQuery.execute();
+
+								queryFinish(qct, result.getResult().size());
 
 								int ct = 0;
 
@@ -1298,7 +1419,11 @@ public class CassandraStore implements StoreService {
 								subscriber.onCompleted();
 
 							} catch (final Exception e) {
+
+								queryFailed(qct, e);
+
 								subscriber.onError(e);
+
 							}
 
 						}
@@ -1318,9 +1443,7 @@ public class CassandraStore implements StoreService {
 
 		@Override
 		public Thread newThread(final Runnable r) {
-			final Thread t =
-					new Thread(r, "cassandra-query-"
-							+ threadNumber.getAndIncrement());
+			final Thread t = new Thread(r, "cassandra-query-" + threadNumber.getAndIncrement());
 			t.setDaemon(true);
 			return t;
 		}
