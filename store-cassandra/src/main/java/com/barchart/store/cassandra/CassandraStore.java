@@ -1215,7 +1215,7 @@ public class CassandraStore implements StoreService {
 
 								final OperationResult<Rows<R, C>> result = rowQuery.execute();
 
-								queryFinish(qct, result.getResult().size());
+								queryFinish(qct, 0);
 
 								int ct = 0;
 								for (final Row<R, C> row : result.getResult()) {
