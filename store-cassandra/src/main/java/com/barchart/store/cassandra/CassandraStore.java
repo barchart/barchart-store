@@ -100,15 +100,21 @@ public class CassandraStore implements StoreService {
 	private ConsistencyLevel readConsistency = ConsistencyLevel.CL_LOCAL_QUORUM;
 	private ConsistencyLevel writeConsistency = ConsistencyLevel.CL_LOCAL_QUORUM;
 
-	private int maxConns = 100;
-	private int maxConnsPerHost = 50;
-	private int maxRowSlice = 100;
+	private int writePoolSize = 100;
+	private int writeQueueSize = 0;
+
+	private BlockingQueue<Runnable> writeQueue;
+	private ThreadPoolExecutor writeExecutor;
+
+	private int readPoolSize = 100;
+	private int readQueueSize = 0;
+	private int readBatchSize = 100;
+
+	private BlockingQueue<Runnable> readQueue;
+	private ThreadPoolExecutor readExecutor;
 
 	private String user = "cassandra";
 	private String password = "cassandra";
-
-	private final ThreadPoolExecutor executor;
-	private final BlockingQueue<Runnable> executorQueue;
 
 	private final AtomicLong queryCount = new AtomicLong(1);
 	private final AtomicInteger concurrentQueries = new AtomicInteger(0);
@@ -119,8 +125,7 @@ public class CassandraStore implements StoreService {
 	private AstyanaxContext<Cluster> clusterContext = null;
 
 	public CassandraStore() {
-		executorQueue = new LinkedBlockingQueue<Runnable>();
-		executor = new ThreadPoolExecutor(maxConns, maxConns, 60, TimeUnit.SECONDS, executorQueue, new DaemonFactory());
+
 	}
 
 	public void setSeeds(final String... seeds_) {
@@ -144,27 +149,35 @@ public class CassandraStore implements StoreService {
 	}
 
 	/**
-	 * This should be tuned in conjunction with setMaxConnectionsPerHost() to
-	 * ensure that the number of connections is not greater than (hosts x
-	 * maxConnsPerHost) for your cluster. If it is, you may encounter pool
-	 * timeouts during heavy use.
+	 * Set the size of the connection pool for servicing write requests.
 	 */
-	public void setMaxConnections(final int max_) {
-		if (max_ < maxConns) {
-			executor.setCorePoolSize(max_);
-			executor.setMaximumPoolSize(max_);
-		} else {
-			executor.setMaximumPoolSize(max_);
-			executor.setCorePoolSize(max_);
-		}
-		maxConns = max_;
+	public void setWritePoolSize(final int size) {
+		writePoolSize = size;
 	}
 
 	/**
-	 * The maximum number of connections to open to each cluster node.
+	 * The maximum number of write queries to queue if all connections are in
+	 * use. If a query is submitted while the queue is at capacity, a rejected
+	 * execution exception will be thrown.
 	 */
-	public void setMaxConnectionsPerHost(final int max_) {
-		maxConnsPerHost = max_;
+	public void setWriteQueueSize(final int size) {
+		writeQueueSize = size;
+	}
+
+	/**
+	 * Set the size of the connection pool for servicing read requests.
+	 */
+	public void setReadPoolSize(final int size) {
+		readPoolSize = size;
+	}
+
+	/**
+	 * The maximum number of read queries to queue if all connections are in
+	 * use. If a query is submitted while the queue is at capacity, a rejected
+	 * execution exception will be thrown.
+	 */
+	public void setReadQueueSize(final int size) {
+		readQueueSize = size;
 	}
 
 	/**
@@ -173,8 +186,8 @@ public class CassandraStore implements StoreService {
 	 * are requested by the client, they will be split into multiple queries
 	 * behind the scenes (but will look the same to the client.)
 	 */
-	public void setMaxRowSlice(final int max_) {
-		maxRowSlice = max_;
+	public void setReadBatchSize(final int max_) {
+		readBatchSize = max_;
 	}
 
 	public void setReadConsistency(final ConsistencyLevel level_) {
@@ -192,6 +205,20 @@ public class CassandraStore implements StoreService {
 
 	public void connect() {
 
+		// Initialize query pools
+
+		writeQueue = writeQueueSize > 0
+				? new LinkedBlockingQueue<Runnable>(writeQueueSize)
+				: new LinkedBlockingQueue<Runnable>();
+		writeExecutor = new ThreadPoolExecutor(writePoolSize, writePoolSize, 60, TimeUnit.SECONDS, writeQueue,
+				new DaemonFactory(), new ThreadPoolExecutor.AbortPolicy());
+
+		readQueue = readQueueSize > 0
+				? new LinkedBlockingQueue<Runnable>(readQueueSize)
+				: new LinkedBlockingQueue<Runnable>();
+		readExecutor = new ThreadPoolExecutor(readPoolSize, readPoolSize, 60, TimeUnit.SECONDS, readQueue,
+				new DaemonFactory(), new ThreadPoolExecutor.AbortPolicy());
+
 		final Builder builder = new AstyanaxContext.Builder()
 				.forCluster(clusterName)
 				.withAstyanaxConfiguration(new AstyanaxConfigurationImpl()
@@ -204,16 +231,13 @@ public class CassandraStore implements StoreService {
 				.withConnectionPoolConfiguration(new ConnectionPoolConfigurationImpl(
 						"barchart_pool")
 						.setSeeds(Joiner.on(",").join(seeds))
-						.setMaxConns(maxConns)
-						.setMaxConnsPerHost(maxConnsPerHost)
+						.setMaxConns(readPoolSize + writePoolSize)
+						.setMaxConnsPerHost(readPoolSize + writePoolSize)
 						.setConnectTimeout(5000)
 						.setSocketTimeout(10000)
 						.setMaxTimeoutCount(10)
 						// This is not a network timeout, but a connection pool
-						// timeout if all connections are in use. In theory this
-						// should not ever happen since our Executor has the
-						// same number of threads as the connection pool, but it
-						// still does.
+						// timeout if all connections are in use.
 						.setMaxTimeoutWhenExhausted(30000)
 						// Added those to solidify the connection as I get a
 						// timeout quite often
@@ -528,21 +552,18 @@ public class CassandraStore implements StoreService {
 	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableQueryBuilder<R, C> fetch(
 			final String database, final Table<R, C, V> table, final R... keys) throws Exception {
 		if (keys == null || keys.length == 0) {
-			return new CassandraAllRowsQuery<R, C>(database, table,
-					readConsistency, executor);
+			return new CassandraAllRowsQuery<R, C>(database, table, readConsistency, readExecutor);
 		} else if (keys.length == 1) {
-			return new CassandraSingleRowQuery<R, C>(database, table,
-					readConsistency, executor, keys[0]);
+			return new CassandraSingleRowQuery<R, C>(database, table, readConsistency, readExecutor, keys[0]);
 		} else {
-			return new CassandraMultiRowQuery<R, C>(database, table,
-					readConsistency, executor, keys);
+			return new CassandraMultiRowQuery<R, C>(database, table, readConsistency, readExecutor, keys);
 		}
 	}
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableIndexQueryBuilder<R, C> query(
 			final String database, final Table<R, C, V> table) throws Exception {
-		return new CassandraSearchQuery<R, C>(database, table, readConsistency, executor);
+		return new CassandraSearchQuery<R, C>(database, table, readConsistency, readExecutor);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -567,17 +588,39 @@ public class CassandraStore implements StoreService {
 
 	private volatile long lastConnectionWarning = 0;
 
-	private <R> long queryStart(final String label, final R... keys) {
+	private <R> long writeStart(final String label) {
 
-		if (log.isDebugEnabled() && executorQueue.size() > 0) {
+		if (log.isDebugEnabled() && writeQueue.size() > 0) {
 			final long now = System.currentTimeMillis();
 			if (now - lastConnectionWarning > 10000) {
 				lastConnectionWarning = now;
-				log.debug("Executor pool is full (" + maxConns + " threads). While this is "
+				log.debug("Write pool is full (" + writePoolSize + " threads). While this is "
 						+ "not necessarily a problem, you should verify pool configuration "
 						+ "if latency becomes an issue.");
 			}
 		}
+
+		return queryStart(label);
+
+	}
+
+	private <R> long readStart(final String label, final R... keys) {
+
+		if (log.isDebugEnabled() && readQueue.size() > 0) {
+			final long now = System.currentTimeMillis();
+			if (now - lastConnectionWarning > 10000) {
+				lastConnectionWarning = now;
+				log.debug("Read pool is full (" + readPoolSize + " threads). While this is "
+						+ "not necessarily a problem, you should verify pool configuration "
+						+ "if latency becomes an issue.");
+			}
+		}
+
+		return queryStart(label, keys);
+
+	}
+
+	private <R> long queryStart(final String label, final R... keys) {
 
 		if (log.isTraceEnabled()) {
 
@@ -636,12 +679,12 @@ public class CassandraStore implements StoreService {
 				@Override
 				public void call(final Subscriber<? super Boolean> subscriber) {
 
-					executor.execute(new Runnable() {
+					writeExecutor.execute(new Runnable() {
 
 						@Override
 						public void run() {
 
-							final long qct = queryStart("commit");
+							final long qct = writeStart("commit");
 
 							try {
 
@@ -827,7 +870,6 @@ public class CassandraStore implements StoreService {
 	private abstract class CassandraBaseRowQuery<R extends Comparable<R>, C extends Comparable<C>> implements
 			ObservableQueryBuilder<R, C> {
 
-		protected final Keyspace keyspace;
 		protected final ColumnFamilyQuery<R, C> query;
 		protected final Executor executor;
 
@@ -838,9 +880,10 @@ public class CassandraStore implements StoreService {
 				final Table<R, C, ?> table_, final ConsistencyLevel level_,
 				final Executor executor_) throws ConnectionException {
 
-			keyspace = clusterContext.getClient().getKeyspace(database_);
-
-			query = keyspace.prepareQuery(columnFamily(table_)).setConsistencyLevel(level_);
+			query = clusterContext.getClient()
+					.getKeyspace(database_)
+					.prepareQuery(columnFamily(table_))
+					.setConsistencyLevel(level_);
 
 			executor = executor_;
 
@@ -993,7 +1036,7 @@ public class CassandraStore implements StoreService {
 
 							try {
 
-								qct = queryStart("keys");
+								qct = readStart("keys");
 
 								final OperationResult<ColumnList<C>> result = rowQuery.execute();
 
@@ -1078,7 +1121,7 @@ public class CassandraStore implements StoreService {
 								int ct = 0;
 
 								final int realBatchSize =
-										batchSize == 0 ? maxRowSlice : Math.min(batchSize, maxRowSlice);
+										batchSize == 0 ? readBatchSize : Math.min(batchSize, readBatchSize);
 
 								outer:
 								for (final R[] batch : batches(keys, realBatchSize)) {
@@ -1091,7 +1134,7 @@ public class CassandraStore implements StoreService {
 										rowQuery.withColumnRange(columnRange.build());
 									}
 
-									qct = queryStart("keys");
+									qct = readStart("keys");
 
 									final OperationResult<Rows<R, C>> result = rowQuery.execute();
 
@@ -1211,7 +1254,7 @@ public class CassandraStore implements StoreService {
 
 							try {
 
-								qct = queryStart("keys");
+								qct = readStart("keys");
 
 								final OperationResult<Rows<R, C>> result = rowQuery.execute();
 
@@ -1393,7 +1436,7 @@ public class CassandraStore implements StoreService {
 
 							try {
 
-								qct = queryStart("search");
+								qct = readStart("search");
 
 								final OperationResult<Rows<R, C>> result = indexQuery.execute();
 
