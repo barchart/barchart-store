@@ -11,7 +11,7 @@
 
 	<groupId>com.barchart.store</groupId>
 	<artifactId>store-cassandra</artifactId>
-	<version>5.0.18-SNAPSHOT</version>
+	<version>5.0.19-SNAPSHOT</version>
 	<packaging>bundle</packaging>
 
 	<description>
@@ -41,17 +41,16 @@ Cassandra data store implementation and OSGI components
 			<version>[4.0-SNAPSHOT,4.1-SNAPSHOT)</version>
 		</dependency>
 
-		<!-- Astyanax Wrapped for OSGi -->
-		<dependency>
-			<groupId>com.barchart.wrap</groupId>
-			<artifactId>barchart-wrap-astyanax</artifactId>
-		</dependency>
-
 		<dependency>
 			<groupId>com.barchart.store</groupId>
 			<artifactId>store-util</artifactId>
 			<version>[3-SNAPSHOT,4-SNAPSHOT)</version>
-			<scope>test</scope>
+		</dependency>
+
+		<!-- Astyanax Wrapped for OSGi -->
+		<dependency>
+			<groupId>com.barchart.wrap</groupId>
+			<artifactId>barchart-wrap-astyanax</artifactId>
 		</dependency>
 
 		<dependency>
