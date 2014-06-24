@@ -45,6 +45,7 @@ import com.netflix.astyanax.ColumnListMutation;
 import com.netflix.astyanax.Keyspace;
 import com.netflix.astyanax.MutationBatch;
 import com.netflix.astyanax.Serializer;
+import com.netflix.astyanax.connectionpool.ConnectionPoolConfiguration;
 import com.netflix.astyanax.connectionpool.NodeDiscoveryType;
 import com.netflix.astyanax.connectionpool.OperationResult;
 import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
@@ -100,6 +101,8 @@ public class CassandraStore implements StoreService {
 	private ConsistencyLevel readConsistency = ConsistencyLevel.CL_LOCAL_QUORUM;
 	private ConsistencyLevel writeConsistency = ConsistencyLevel.CL_LOCAL_QUORUM;
 
+	private String zone = null;
+
 	private int writePoolSize = 100;
 	private int writeQueueSize = 0;
 
@@ -144,6 +147,10 @@ public class CassandraStore implements StoreService {
 		zones = zones_;
 	}
 
+	public void setLocalZone(final String zone_) {
+		zone = zone_;
+	}
+
 	public void setReplicationFactor(final int factor_) {
 		replicationFactor = factor_;
 	}
@@ -156,9 +163,8 @@ public class CassandraStore implements StoreService {
 	}
 
 	/**
-	 * The maximum number of write queries to queue if all connections are in
-	 * use. If a query is submitted while the queue is at capacity, a rejected
-	 * execution exception will be thrown.
+	 * The maximum number of write queries to queue if all connections are in use. If a query is submitted while the
+	 * queue is at capacity, a rejected execution exception will be thrown.
 	 */
 	public void setWriteQueueSize(final int size) {
 		writeQueueSize = size;
@@ -172,19 +178,17 @@ public class CassandraStore implements StoreService {
 	}
 
 	/**
-	 * The maximum number of read queries to queue if all connections are in
-	 * use. If a query is submitted while the queue is at capacity, a rejected
-	 * execution exception will be thrown.
+	 * The maximum number of read queries to queue if all connections are in use. If a query is submitted while the
+	 * queue is at capacity, a rejected execution exception will be thrown.
 	 */
 	public void setReadQueueSize(final int size) {
 		readQueueSize = size;
 	}
 
 	/**
-	 * The maximum number of rows to request by key per query. Requesting too
-	 * many rows by key seems to send C* into a tailspin. If more than max_ keys
-	 * are requested by the client, they will be split into multiple queries
-	 * behind the scenes (but will look the same to the client.)
+	 * The maximum number of rows to request by key per query. Requesting too many rows by key seems to send C* into a
+	 * tailspin. If more than max_ keys are requested by the client, they will be split into multiple queries behind the
+	 * scenes (but will look the same to the client.)
 	 */
 	public void setReadBatchSize(final int max_) {
 		readBatchSize = max_;
@@ -228,32 +232,44 @@ public class CassandraStore implements StoreService {
 						// https://github.com/Netflix/astyanax/issues/127
 						.setCqlVersion("3.0.0")
 						.setTargetCassandraVersion("1.2"))
-				.withConnectionPoolConfiguration(new ConnectionPoolConfigurationImpl(
-						"barchart_pool")
-						.setSeeds(Joiner.on(",").join(seeds))
-						.setMaxConns(readPoolSize + writePoolSize)
-						.setMaxConnsPerHost(readPoolSize + writePoolSize)
-						.setConnectTimeout(5000)
-						.setSocketTimeout(10000)
-						.setMaxTimeoutCount(10)
-						// This is not a network timeout, but a connection pool
-						// timeout if all connections are in use.
-						.setMaxTimeoutWhenExhausted(30000)
-						// Added those to solidify the connection as I get a
-						// timeout quite often
-						.setLatencyAwareUpdateInterval(10000)
-						// Resort hosts per token partition every 10 seconds
-						.setLatencyAwareResetInterval(10000)
-						.setLatencyAwareBadnessThreshold(2)
-						// Uses last 100 latency samples
-						.setLatencyAwareWindowSize(100)
-						.setAuthenticationCredentials(new SimpleAuthenticationCredentials(this.user, this.password)))
+				.withConnectionPoolConfiguration(connectionPoolConfig())
 				.withConnectionPoolMonitor(new CountingConnectionPoolMonitor());
 
 		// get cluster
 		clusterContext = builder.buildCluster(ThriftFamilyFactory.getInstance());
 
 		clusterContext.start();
+
+	}
+
+	private ConnectionPoolConfiguration connectionPoolConfig() {
+
+		final ConnectionPoolConfigurationImpl config = new ConnectionPoolConfigurationImpl(
+				"barchart_pool")
+				.setSeeds(Joiner.on(",").join(seeds))
+				.setMaxConns(readPoolSize + writePoolSize)
+				.setMaxConnsPerHost(readPoolSize + writePoolSize)
+				.setConnectTimeout(5000)
+				.setSocketTimeout(10000)
+				.setMaxTimeoutCount(10)
+				// This is not a network timeout, but a connection pool
+				// timeout if all connections are in use.
+				.setMaxTimeoutWhenExhausted(30000)
+				// Added those to solidify the connection as I get a
+				// timeout quite often
+				.setLatencyAwareUpdateInterval(10000)
+				// Resort hosts per token partition every 10 seconds
+				.setLatencyAwareResetInterval(10000)
+				.setLatencyAwareBadnessThreshold(2)
+				// Uses last 100 latency samples
+				.setLatencyAwareWindowSize(100)
+				.setAuthenticationCredentials(new SimpleAuthenticationCredentials(user, password));
+
+		if (zone != null) {
+			config.setLocalDatacenter(zone);
+		}
+
+		return config;
 
 	}
 
@@ -529,7 +545,11 @@ public class CassandraStore implements StoreService {
 
 	@Override
 	public Batch batch(final String keyspace) throws Exception {
-		return new CassandraBatchMutator(clusterContext.getClient().getKeyspace(keyspace));
+		return new CassandraBatchMutator(clusterContext.getClient().getKeyspace(keyspace), writeConsistency);
+	}
+
+	public Batch batch(final String keyspace, final ConsistencyLevel level) throws Exception {
+		return new CassandraBatchMutator(clusterContext.getClient().getKeyspace(keyspace), level);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -551,12 +571,20 @@ public class CassandraStore implements StoreService {
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableQueryBuilder<R, C> fetch(
 			final String database, final Table<R, C, V> table, final R... keys) throws Exception {
+
+		return fetch(database, table, readConsistency, keys);
+
+	}
+
+	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableQueryBuilder<R, C> fetch(
+			final String database, final Table<R, C, V> table, final ConsistencyLevel level, final R... keys)
+			throws Exception {
 		if (keys == null || keys.length == 0) {
-			return new CassandraAllRowsQuery<R, C>(database, table, readConsistency, readExecutor);
+			return new CassandraAllRowsQuery<R, C>(database, table, level, readExecutor);
 		} else if (keys.length == 1) {
-			return new CassandraSingleRowQuery<R, C>(database, table, readConsistency, readExecutor, keys[0]);
+			return new CassandraSingleRowQuery<R, C>(database, table, level, readExecutor, keys[0]);
 		} else {
-			return new CassandraMultiRowQuery<R, C>(database, table, readConsistency, readExecutor, keys);
+			return new CassandraMultiRowQuery<R, C>(database, table, level, readExecutor, keys);
 		}
 	}
 
@@ -660,8 +688,8 @@ public class CassandraStore implements StoreService {
 
 		private MutationBatch batch = null;
 
-		CassandraBatchMutator(final Keyspace keyspace) {
-			batch = keyspace.prepareMutationBatch().withConsistencyLevel(writeConsistency);
+		CassandraBatchMutator(final Keyspace keyspace, final ConsistencyLevel level) {
+			batch = keyspace.prepareMutationBatch().withConsistencyLevel(level);
 		}
 
 		@Override
