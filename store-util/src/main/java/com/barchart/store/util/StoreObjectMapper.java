@@ -6,6 +6,7 @@ import java.util.List;
 
 import rx.Observable;
 import rx.Observer;
+import rx.Subscriber;
 import rx.functions.Func1;
 
 import com.barchart.store.api.Batch;
@@ -314,9 +315,8 @@ public abstract class StoreObjectMapper {
 			final RowMutator<C> mutator = batch.row(table, key);
 
 			mapper(mapper).encode(obj, mutator);
-			batch.commit();
 
-			return Observable.<T> from(obj);
+			return batch.commit().lift(new SuccessResult<T>(obj));
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -344,9 +344,8 @@ public abstract class StoreObjectMapper {
 			for (final U obj : objects) {
 				m.encode(obj, mutator);
 			}
-			batch.commit();
 
-			return Observable.<T> from(objects);
+			return batch.commit().lift(new SuccessResult<T>(objects));
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -375,9 +374,7 @@ public abstract class StoreObjectMapper {
 					for (final R key : slice) {
 						batch.row(table, key).delete();
 					}
-					batch.commit();
-
-					return Observable.from(slice);
+					return batch.commit().lift(new SuccessResult<R>(slice));
 
 				} catch (final Exception e) {
 					return Observable.error(e);
@@ -409,9 +406,7 @@ public abstract class StoreObjectMapper {
 				row.remove(column);
 			}
 
-			batch.commit();
-
-			return Observable.from(columns);
+			return batch.commit().lift(new SuccessResult<C>(columns));
 
 		} catch (final Exception e) {
 			return Observable.error(e);
@@ -519,6 +514,41 @@ public abstract class StoreObjectMapper {
 		}
 
 		return strings;
+
+	}
+
+	protected static class SuccessResult<T> implements Observable.Operator<T, Boolean> {
+
+		private final T[] result;
+
+		protected SuccessResult(final T... result_) {
+			result = result_;
+		}
+
+		@Override
+		public Subscriber<? super Boolean> call(final Subscriber<? super T> subscriber) {
+
+			return new Subscriber<Boolean>(subscriber) {
+
+				@Override
+				public void onCompleted() {
+					for (final T item : result)
+						subscriber.onNext(item);
+					subscriber.onCompleted();
+				}
+
+				@Override
+				public void onError(final Throwable e) {
+					subscriber.onError(e);
+				}
+
+				@Override
+				public void onNext(final Boolean success) {
+				}
+
+			};
+
+		}
 
 	}
 
