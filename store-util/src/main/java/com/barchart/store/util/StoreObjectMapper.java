@@ -2,10 +2,13 @@ package com.barchart.store.util;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import rx.Observable;
 import rx.Subscriber;
+import rx.functions.Func0;
 import rx.functions.Func1;
 
 import com.barchart.store.api.Batch;
@@ -38,6 +41,7 @@ public abstract class StoreObjectMapper {
 	private int maxWriteBatch = 100;
 
 	private final MapperFactory mappers;
+	private final Map<Table<?, ?, ?>, TableCache<?, ?>> caches = new HashMap<Table<?, ?, ?>, TableCache<?, ?>>();
 
 	public StoreObjectMapper(final StoreService store_, final String database_,
 			final StoreSchema schema_) {
@@ -51,8 +55,7 @@ public abstract class StoreObjectMapper {
 	}
 
 	/**
-	 * Set the maximum batch size for row read queries to prevent unbounded
-	 * multi-gets.
+	 * Set the maximum batch size for row read queries to prevent unbounded multi-gets.
 	 */
 	public void maxReadBatch(final int size) {
 		maxReadBatch = size;
@@ -80,16 +83,22 @@ public abstract class StoreObjectMapper {
 	}
 
 	/**
-	 * Update the data store schema definition. This should only be called
-	 * manually.
+	 * Update the data store schema definition. This should only be called manually.
 	 */
 	public void updateSchema() throws Exception {
 		schema.update(store, database);
 	}
 
+	/**
+	 * Set the cache for a table.
+	 */
+	public <R extends Comparable<R>, C extends Comparable<C>, V> void setTableCache(final Table<R, C, V> table,
+			final TableCache<R, C> cache) {
+		caches.put(table, cache);
+	}
+
 	/*
-	 * Direct store access methods for subclasses with more complex query
-	 * requirements.
+	 * Direct store access methods for subclasses with more complex query requirements.
 	 */
 
 	protected StoreService store() {
@@ -117,10 +126,22 @@ public abstract class StoreObjectMapper {
 	 * @return A lazy observable that executes on every subscribe
 	 */
 	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, T>> Observable<T> loadRows(
-			final Table<R, C, V> table, final Class<M> mapper,
-			final R... keys) {
+			final Table<R, C, V> table, final Class<M> mapper, final R... keys) {
 
-		return batch(new Func1<R[], Observable<T>>() {
+		@SuppressWarnings("unchecked")
+		final TableCache<R, C> cache = (TableCache<R, C>) caches.get(table);
+
+		if (cache == null)
+			return rowLoader(table, mapper, keys).call(keys);
+
+		return cache.rows(rowLoader(table, mapper, keys), keys);
+
+	}
+
+	private <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends RowMapper<R, C, T>> Func1<R[], Observable<T>> rowLoader(
+			final Table<R, C, V> table, final Class<M> mapper, final R... keys) {
+
+		return batchLoader(new Func1<R[], Observable<T>>() {
 
 			@Override
 			public Observable<T> call(final R[] slice) {
@@ -133,7 +154,7 @@ public abstract class StoreObjectMapper {
 
 			}
 
-		}, keys, maxReadBatch);
+		}, maxReadBatch);
 
 	}
 
@@ -149,20 +170,42 @@ public abstract class StoreObjectMapper {
 	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends ColumnListMapper<R, C, T>> Observable<T> loadColumns(
 			final Table<R, C, V> table, final Class<M> mapper, final R key, final C... columns) {
 
-		try {
+		@SuppressWarnings("unchecked")
+		final TableCache<R, C> cache = (TableCache<R, C>) caches.get(table);
 
-			@SuppressWarnings("unchecked")
-			final ObservableQueryBuilder<R, C> query = store.fetch(database, table, key);
+		if (cache == null)
+			return columnLoader(table, mapper, key).call(columns);
 
-			if (columns != null && columns.length > 0) {
-				query.columns(columns);
+		return cache.columns(columnLoader(table, mapper, key), key, columns);
+
+	}
+
+	private <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends ColumnListMapper<R, C, T>> Func1<C[], Observable<T>> columnLoader(
+			final Table<R, C, V> table, final Class<M> mapper, final R key) {
+
+		return new Func1<C[], Observable<T>>() {
+
+			@Override
+			public Observable<T> call(final C[] columns) {
+
+				try {
+
+					@SuppressWarnings("unchecked")
+					final ObservableQueryBuilder<R, C> query = store.fetch(database, table, key);
+
+					if (columns != null && columns.length > 0) {
+						query.columns(columns);
+					}
+
+					return query.build().lift(mapper(mapper));
+
+				} catch (final Exception e) {
+					return Observable.error(e);
+				}
+
 			}
 
-			return query.build().lift(mapper(mapper));
-
-		} catch (final Exception e) {
-			return Observable.error(e);
-		}
+		};
 
 	}
 
@@ -179,11 +222,33 @@ public abstract class StoreObjectMapper {
 	protected <R extends Comparable<R>, V, T, M extends ColumnListMapper<R, String, T>> Observable<T> loadColumnsByPrefix(
 			final Table<R, String, V> table, final Class<M> mapper, final R key, final String prefix) {
 
-		try {
-			return store.fetch(database, table, key).prefix(prefix).build().lift(mapper(mapper));
-		} catch (final Exception e) {
-			return Observable.error(e);
-		}
+		@SuppressWarnings("unchecked")
+		final TableCache<R, ?> cache = (TableCache<R, ?>) caches.get(table);
+
+		if (cache == null)
+			return columnPrefixLoader(table, mapper, key, prefix).call();
+
+		return cache.columnsByPrefix(columnPrefixLoader(table, mapper, key, prefix), key, prefix);
+
+	}
+
+	private <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends ColumnListMapper<R, C, T>> Func0<Observable<T>> columnPrefixLoader(
+			final Table<R, C, V> table, final Class<M> mapper, final R key, final String prefix) {
+
+		return new Func0<Observable<T>>() {
+
+			@Override
+			public Observable<T> call() {
+
+				try {
+					return store.fetch(database, table, key).prefix(prefix).build().lift(mapper(mapper));
+				} catch (final Exception e) {
+					return Observable.error(e);
+				}
+
+			}
+
+		};
 
 	}
 
@@ -200,17 +265,39 @@ public abstract class StoreObjectMapper {
 	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends ColumnListMapper<R, C, T>> Observable<T> loadColumns(
 			final Table<R, C, V> table, final Class<M> mapper, final R key, final int count, final boolean reverse) {
 
-		try {
+		@SuppressWarnings("unchecked")
+		final TableCache<R, C> cache = (TableCache<R, C>) caches.get(table);
 
-			return store.fetch(database, table, key)
-					.reverse(reverse)
-					.limit(count)
-					.build()
-					.lift(mapper(mapper));
+		if (cache == null)
+			return columnLoader(table, mapper, key, count, reverse).call();
 
-		} catch (final Exception e) {
-			return Observable.error(e);
-		}
+		return cache.columns(columnLoader(table, mapper, key, count, reverse), key, count, reverse);
+
+	}
+
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends ColumnListMapper<R, C, T>> Func0<Observable<T>> columnLoader(
+			final Table<R, C, V> table, final Class<M> mapper, final R key, final int count, final boolean reverse) {
+
+		return new Func0<Observable<T>>() {
+
+			@Override
+			public Observable<T> call() {
+
+				try {
+
+					return store.fetch(database, table, key)
+							.reverse(reverse)
+							.limit(count)
+							.build()
+							.lift(mapper(mapper));
+
+				} catch (final Exception e) {
+					return Observable.error(e);
+				}
+
+			}
+
+		};
 
 	}
 
@@ -229,11 +316,33 @@ public abstract class StoreObjectMapper {
 	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends ColumnListMapper<R, C, T>> Observable<T> loadColumns(
 			final Table<R, C, V> table, final Class<M> mapper, final R key, final C start, final C end) {
 
-		try {
-			return store.fetch(database, table, key).start(start).end(end).build().lift(mapper(mapper));
-		} catch (final Exception e) {
-			return Observable.error(e);
-		}
+		@SuppressWarnings("unchecked")
+		final TableCache<R, C> cache = (TableCache<R, C>) caches.get(table);
+
+		if (cache == null)
+			return columnLoader(table, mapper, key, start, end).call();
+
+		return cache.columns(columnLoader(table, mapper, key, start, end), key, start, end);
+
+	}
+
+	protected <R extends Comparable<R>, C extends Comparable<C>, V, T, M extends ColumnListMapper<R, C, T>> Func0<Observable<T>> columnLoader(
+			final Table<R, C, V> table, final Class<M> mapper, final R key, final C start, final C end) {
+
+		return new Func0<Observable<T>>() {
+
+			@Override
+			public Observable<T> call() {
+
+				try {
+					return store.fetch(database, table, key).start(start).end(end).build().lift(mapper(mapper));
+				} catch (final Exception e) {
+					return Observable.error(e);
+				}
+
+			}
+
+		};
 
 	}
 
@@ -426,8 +535,7 @@ public abstract class StoreObjectMapper {
 	}
 
 	/**
-	 * Auto subscribe to an observable, caching the result for future
-	 * subscriptions.
+	 * Auto subscribe to an observable, caching the result for future subscriptions.
 	 */
 	protected static <T> Observable<T> cache(final Observable<T> observable) {
 		final Observable<T> cached = observable.cache();
@@ -436,28 +544,47 @@ public abstract class StoreObjectMapper {
 	}
 
 	/**
-	 * Split a set of objects into batches and run a task over each batch. This
-	 * should be used extensively when requesting objects over multiple rows,
-	 * since unbounded multi-get queries can kill a cluster very quickly.
+	 * Split a set of objects into batches and run a task over each batch. This should be used extensively when
+	 * requesting objects over multiple rows, since unbounded multi-get queries can kill a cluster very quickly.
 	 *
 	 * http://www.datastax.com/documentation/cassandra/1.2/cassandra/
-	 * architecture/architecturePlanningAntiPatterns_c.html?scroll=
-	 * concept_ds_emm_hwl_fk__multiple-gets
+	 * architecture/architecturePlanningAntiPatterns_c.html?scroll= concept_ds_emm_hwl_fk__multiple-gets
 	 */
 	protected static <T, K> Observable<T> batch(final Func1<K[], Observable<T>> task, final K[] params,
 			final int batchSize) {
+		return batchLoader(task, batchSize).call(params);
+	}
 
-		if (params.length <= batchSize) {
-			return task.call(params);
-		}
+	/**
+	 * Split a set of objects into batches and run a task over each batch. This should be used extensively when
+	 * requesting objects over multiple rows, since unbounded multi-get queries can kill a cluster very quickly.
+	 *
+	 * http://www.datastax.com/documentation/cassandra/1.2/cassandra/
+	 * architecture/architecturePlanningAntiPatterns_c.html?scroll= concept_ds_emm_hwl_fk__multiple-gets
+	 */
+	protected static <T, K> Func1<K[], Observable<T>> batchLoader(final Func1<K[], Observable<T>> task,
+			final int batchSize) {
 
-		final List<Observable<T>> results = new ArrayList<Observable<T>>();
+		return new Func1<K[], Observable<T>>() {
 
-		for (final K[] slice : slice(params, batchSize)) {
-			results.add(task.call(slice));
-		}
+			@Override
+			public Observable<T> call(final K[] keys) {
 
-		return Observable.mergeDelayError(Observable.from(results));
+				if (keys.length <= batchSize) {
+					return task.call(keys);
+				}
+
+				final List<Observable<T>> results = new ArrayList<Observable<T>>();
+
+				for (final K[] slice : slice(keys, batchSize)) {
+					results.add(task.call(slice));
+				}
+
+				return Observable.mergeDelayError(Observable.from(results));
+
+			}
+
+		};
 
 	}
 
