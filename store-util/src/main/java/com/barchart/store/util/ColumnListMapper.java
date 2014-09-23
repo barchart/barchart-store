@@ -60,7 +60,7 @@ public abstract class ColumnListMapper<R extends Comparable<R>, C extends Compar
 
 	}
 
-	protected abstract void encode(T obj, RowMutator<C> mutator) throws Exception;
+	protected abstract C encode(T obj, RowMutator<C> mutator) throws Exception;
 
 	protected abstract T decode(StoreColumn<C> column) throws Exception;
 
