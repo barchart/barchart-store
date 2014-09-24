@@ -199,6 +199,8 @@ public abstract class StoreLock implements Lock {
 
 			row.commit().toBlockingObservable().lastOrDefault(false);
 
+			LOG.trace("unlocked: " + id);
+
 		} catch (final Exception e) {
 
 			LOG.error("Failed to release lock", e);
@@ -216,33 +218,41 @@ public abstract class StoreLock implements Lock {
 
 			final StoreRow<String, UUID> row = fetch(name).build().toBlockingObservable().single();
 
-			boolean first = true;
-
+			LOG.trace("lock id: " + id);
+			LOG.trace("lock queue: " + row.size());
 			for (int i = 0; i < row.size(); i++) {
 
 				final StoreColumn<UUID> col = row.getByIndex(i);
 
 				final boolean valid = col.getLong() > System.currentTimeMillis();
+				final boolean match = col.getName().equals(id);
+
+				LOG.trace(i + ": " + col.getName() + (!valid ? " (exp)" : ""));
 
 				if (!valid) {
+
 					// Expired column
 					expired.add(col.getName());
-				}
 
-				if (col.getName().equals(id)) {
-
-					// Name match
-					if (!valid) {
+					if (match) {
 						throw new LockExpiredException();
-					} else if (first) {
-						// Lock acquired, overwrite with real expiration time
-						register(TimeUnit.MILLISECONDS.convert(expiration, units));
-						return true;
 					}
 
-				}
+					continue;
 
-				first = !(first && valid);
+				} else if (match) {
+
+					// Lock acquired, overwrite with real expiration time
+					register(TimeUnit.MILLISECONDS.convert(expiration, units));
+					LOG.trace("locked: " + id);
+					return true;
+
+				} else {
+
+					// First entry was unexpired and not a match, no lock acquired
+					return false;
+
+				}
 
 			}
 
