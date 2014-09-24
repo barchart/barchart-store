@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import rx.Observable;
+import rx.Observer;
 import rx.Subscriber;
 import rx.functions.Func1;
 
@@ -675,10 +676,10 @@ public class CassandraStore implements StoreService {
 
 	}
 
-	private void queryFailed(final long query, final Exception e) {
+	private void queryFailed(final long query, final Throwable t) {
 
 		if (log.isTraceEnabled()) {
-			log.trace("FAILED " + query + " (" + Thread.currentThread().getName() + ")", e);
+			log.trace("FAILED " + query + " (" + Thread.currentThread().getName() + ")", t);
 			concurrentQueries.decrementAndGet();
 		}
 
@@ -722,11 +723,11 @@ public class CassandraStore implements StoreService {
 
 								subscriber.onCompleted();
 
-							} catch (final Exception e) {
+							} catch (final Throwable t) {
 
-								queryFailed(qct, e);
+								queryFailed(qct, t);
 
-								subscriber.onError(e);
+								subscriber.onError(t);
 
 							}
 
@@ -739,7 +740,22 @@ public class CassandraStore implements StoreService {
 			}).cache();
 
 			// Force subscription for immediate execution
-			obs.subscribe();
+			obs.subscribe(new Observer<Boolean>() {
+
+				@Override
+				public void onCompleted() {
+				}
+
+				@Override
+				public void onError(final Throwable e) {
+					log.error("Commit exception", e);
+				}
+
+				@Override
+				public void onNext(final Boolean t) {
+				}
+
+			});
 
 			return obs;
 
