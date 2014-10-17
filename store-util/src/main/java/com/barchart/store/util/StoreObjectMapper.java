@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import rx.Observable;
+import rx.Observer;
 import rx.Subscriber;
 import rx.functions.Func0;
 import rx.functions.Func1;
@@ -474,9 +475,27 @@ public abstract class StoreObjectMapper {
 	 * Auto subscribe to an observable, caching the result for future subscriptions.
 	 */
 	protected static <T> Observable<T> cache(final Observable<T> observable) {
+
 		final Observable<T> cached = observable.cache();
-		cached.subscribe();
+
+		cached.subscribe(new Observer<T>() {
+
+			@Override
+			public void onCompleted() {
+			}
+
+			@Override
+			public void onError(final Throwable e) {
+			}
+
+			@Override
+			public void onNext(final T t) {
+			}
+
+		});
+
 		return cached;
+
 	}
 
 	/**
