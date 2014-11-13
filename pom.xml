@@ -32,6 +32,7 @@ Layout Project.
 		<module>model</module>
 
 		<module>cassandra-guice</module>
+		<module>heap-guice</module>
 
 	</modules>
 
