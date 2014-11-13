@@ -25,11 +25,13 @@ Layout Project.
 
 	<modules>
 
-		<module>store-api</module>
-		<module>store-cassandra</module>
-		<module>store-heap</module>
-		<module>store-util</module>
-		<module>store-model</module>
+		<module>api</module>
+		<module>cassandra</module>
+		<module>heap</module>
+		<module>util</module>
+		<module>model</module>
+
+		<module>cassandra-guice</module>
 
 	</modules>
 
