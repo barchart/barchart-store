@@ -15,7 +15,7 @@ import com.barchart.store.api.StoreService;
 import com.barchart.store.api.Table;
 import com.barchart.store.cassandra.CassandraLockProvider;
 import com.barchart.store.cassandra.CassandraStore;
-import com.barchart.util.guice.Activatable;
+import com.barchart.util.guice.Activate;
 import com.barchart.util.guice.Component;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
@@ -23,7 +23,7 @@ import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
 import com.typesafe.config.Config;
 
 @Component("com.barchart.store.cassandra")
-public class CassandraStoreProvider implements StoreService, StoreLockService, Activatable {
+public class CassandraStoreProvider implements StoreService, StoreLockService {
 
 	private final CassandraStore store;
 	private CassandraLockProvider locks;
@@ -36,7 +36,7 @@ public class CassandraStoreProvider implements StoreService, StoreLockService, A
 		store = new CassandraStore();
 	}
 
-	@Override
+	@Activate
 	public void activate() {
 
 		if (config.hasPath("seeds")) {

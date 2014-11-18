@@ -14,14 +14,14 @@ import com.barchart.store.api.StoreService;
 import com.barchart.store.api.Table;
 import com.barchart.store.heap.HeapLockProvider;
 import com.barchart.store.heap.HeapStore;
-import com.barchart.util.guice.Activatable;
+import com.barchart.util.guice.Activate;
 import com.barchart.util.guice.Component;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 import com.typesafe.config.Config;
 
 @Component("com.barchart.store.heap")
-public class HeapStoreProvider implements StoreService, StoreLockService, Activatable {
+public class HeapStoreProvider implements StoreService, StoreLockService {
 
 	@Inject
 	@Named("#")
@@ -30,7 +30,7 @@ public class HeapStoreProvider implements StoreService, StoreLockService, Activa
 	private final HeapStore store = new HeapStore();
 	private HeapLockProvider locks;
 
-	@Override
+	@Activate
 	public void activate() throws Exception {
 
 		if (config.hasPath("lock-db")) {
