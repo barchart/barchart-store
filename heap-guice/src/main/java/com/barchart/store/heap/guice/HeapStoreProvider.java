@@ -20,8 +20,10 @@ import com.google.inject.Inject;
 import com.google.inject.name.Named;
 import com.typesafe.config.Config;
 
-@Component("com.barchart.store.heap")
+@Component(HeapStoreProvider.TYPE)
 public class HeapStoreProvider implements StoreService, StoreLockService {
+
+	public static final String TYPE = "com.barchart.store.heap";
 
 	@Inject
 	@Named("#")

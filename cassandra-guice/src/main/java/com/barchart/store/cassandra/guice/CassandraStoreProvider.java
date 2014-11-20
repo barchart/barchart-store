@@ -22,8 +22,10 @@ import com.google.inject.name.Named;
 import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
 import com.typesafe.config.Config;
 
-@Component("com.barchart.store.cassandra")
+@Component(CassandraStoreProvider.TYPE)
 public class CassandraStoreProvider implements StoreService, StoreLockService {
+
+	public static final String TYPE = "com.barchart.store.cassandra";
 
 	private final CassandraStore store;
 	private CassandraLockProvider locks;
