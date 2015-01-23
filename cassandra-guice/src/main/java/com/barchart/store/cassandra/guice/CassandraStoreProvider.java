@@ -27,7 +27,9 @@ public class CassandraStoreProvider implements StoreService, StoreLockService {
 
 	public static final String TYPE = "com.barchart.store.cassandra";
 
-	private final CassandraStore store;
+	private CassandraStore store;
+	private CassandraStore copy;
+	private double copyReadPercent = 0.0d;
 	private CassandraLockProvider locks;
 
 	@Inject
@@ -35,60 +37,25 @@ public class CassandraStoreProvider implements StoreService, StoreLockService {
 	private Config config;
 
 	public CassandraStoreProvider() {
-		store = new CassandraStore();
 	}
 
 	@Activate
 	public void activate() {
 
-		if (config.hasPath("seeds")) {
-			store.setSeeds(config.getStringList("seeds").toArray(new String[] {}));
-		}
+		store = connect(config, config);
 
-		if (config.hasPath("cluster")) {
-			store.setCluster(config.getString("cluster"));
-		}
+		if (config.hasPath("migration")) {
 
-		if (config.hasPath("strategyClass")) {
-			store.setStrategy(config.getString("strategyClass"));
-		}
+			final Config migrationConfig = config.getConfig("migration");
 
-		if (config.hasPath("username")) {
-			store.setCredentials(config.getString("username"), config.getString("pass"));
-		}
+			copy = connect(config.getConfig("migration"), config);
 
-		if (config.hasPath("zones")) {
-
-			final List<String> zonesList = config.getStringList("zones");
-
-			if (zonesList.size() > 0) {
-				store.setZones(zonesList.toArray(new String[] {}));
+			if (migrationConfig.hasPath("read-percent")) {
+				copyReadPercent = migrationConfig.getDouble("read-percent");
 			}
 
-		}
-
-		if (config.hasPath("replicationFactor")) {
-			store.setReplicationFactor(config.getInt("replicationFactor"));
-		}
-
-		if (config.hasPath("writePoolSize")) {
-			store.setWritePoolSize(config.getInt("writePoolSize"));
-		}
-
-		if (config.hasPath("writeQueueSize")) {
-			store.setWriteQueueSize(config.getInt("writeQueueSize"));
-		}
-
-		if (config.hasPath("readPoolSize")) {
-			store.setReadPoolSize(config.getInt("readPoolSize"));
-		}
-
-		if (config.hasPath("readQueueSize")) {
-			store.setReadQueueSize(config.getInt("readQueueSize"));
-		}
-
-		if (config.hasPath("readBatchSize")) {
-			store.setReadBatchSize(config.getInt("readBatchSize"));
+		} else {
+			copy = null;
 		}
 
 		if (config.hasPath("lock-db")) {
@@ -108,73 +75,189 @@ public class CassandraStoreProvider implements StoreService, StoreLockService {
 
 		}
 
-		store.connect();
+	}
+
+	private CassandraStore connect(final Config cluster_, final Config common_) {
+
+		final CassandraStore store_ = new CassandraStore();
+
+		if (cluster_.hasPath("seeds")) {
+			store_.setSeeds(cluster_.getStringList("seeds").toArray(new String[] {}));
+		}
+
+		if (cluster_.hasPath("cluster")) {
+			store_.setCluster(cluster_.getString("cluster"));
+		}
+
+		if (cluster_.hasPath("username")) {
+			store_.setCredentials(cluster_.getString("username"), config.getString("pass"));
+		}
+
+		if (cluster_.hasPath("strategyClass")) {
+			store_.setStrategy(cluster_.getString("strategyClass"));
+		}
+
+		if (cluster_.hasPath("zones")) {
+
+			final List<String> zonesList = cluster_.getStringList("zones");
+
+			if (zonesList.size() > 0) {
+				store_.setZones(zonesList.toArray(new String[] {}));
+			}
+
+		}
+
+		if (cluster_.hasPath("replicationFactor")) {
+			store_.setReplicationFactor(cluster_.getInt("replicationFactor"));
+		}
+
+		if (common_.hasPath("writePoolSize")) {
+			store_.setWritePoolSize(common_.getInt("writePoolSize"));
+		}
+
+		if (common_.hasPath("writeQueueSize")) {
+			store_.setWriteQueueSize(common_.getInt("writeQueueSize"));
+		}
+
+		if (common_.hasPath("readPoolSize")) {
+			store_.setReadPoolSize(common_.getInt("readPoolSize"));
+		}
+
+		if (common_.hasPath("readQueueSize")) {
+			store_.setReadQueueSize(common_.getInt("readQueueSize"));
+		}
+
+		if (common_.hasPath("readBatchSize")) {
+			store_.setReadBatchSize(common_.getInt("readBatchSize"));
+		}
+
+		store_.connect();
+
+		return store_;
 
 	}
 
 	public void deactivate() throws Exception {
+
 		store.disconnect();
+
+		if (copy != null) {
+			copy.disconnect();
+		}
+
+	}
+
+	private CassandraStore reader() {
+
+		if (copy != null && copyReadPercent > 0 && Math.random() <= copyReadPercent) {
+			return copy;
+		}
+
+		return store;
+
 	}
 
 	@Override
 	public boolean has(final String keyspace) throws Exception {
-		return store.has(keyspace);
+		return reader().has(keyspace);
 	}
 
 	@Override
 	public void create(final String keyspace) throws Exception {
+
 		store.create(keyspace);
+
+		if (copy != null) {
+			copy.create(keyspace);
+		}
+
 	}
 
 	@Override
 	public void delete(final String keyspace) throws ConnectionException {
+
 		store.delete(keyspace);
+
+		if (copy != null) {
+			copy.delete(keyspace);
+		}
+
 	}
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> boolean has(final String keyspace,
 			final Table<R, C, V> table)
 			throws ConnectionException {
-		return store.has(keyspace, table);
+		return reader().has(keyspace, table);
 	}
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void create(final String keyspace,
 			final Table<R, C, V> table)
 			throws ConnectionException {
+
 		store.create(keyspace, table);
+
+		if (copy != null) {
+			copy.create(keyspace, table);
+		}
+
 	}
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void update(final String keyspace,
 			final Table<R, C, V> table)
 			throws Exception {
+
 		store.update(keyspace, table);
+
+		if (copy != null) {
+			copy.update(keyspace, table);
+		}
+
 	}
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void truncate(final String keyspace,
 			final Table<R, C, V> table)
 			throws ConnectionException {
+
 		store.truncate(keyspace, table);
+
+		if (copy != null) {
+			copy.truncate(keyspace, table);
+		}
+
 	}
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void delete(final String keyspace,
 			final Table<R, C, V> table)
 			throws ConnectionException {
+
 		store.delete(keyspace, table);
+
+		if (copy != null) {
+			copy.delete(keyspace, table);
+		}
+
 	}
 
 	@Override
 	public Batch batch(final String keyspace) throws Exception {
+
+		if (copy != null) {
+			return new MigrationBatch(store.batch(keyspace), copy.batch(keyspace));
+		}
+
 		return store.batch(keyspace);
+
 	}
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> Observable<Boolean> exists(final String database,
 			final Table<R, C, V> table, final R keys) throws Exception {
-		return store.exists(database, table, keys);
+		return reader().exists(database, table, keys);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -182,13 +265,13 @@ public class CassandraStoreProvider implements StoreService, StoreLockService {
 	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableQueryBuilder<R, C> fetch(
 			final String database,
 			final Table<R, C, V> table, final R... keys) throws Exception {
-		return store.fetch(database, table, keys);
+		return reader().fetch(database, table, keys);
 	}
 
 	@Override
 	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableIndexQueryBuilder<R, C> query(
 			final String database, final Table<R, C, V> table) throws Exception {
-		return store.query(database, table);
+		return reader().query(database, table);
 	}
 
 	@Override
