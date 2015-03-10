@@ -20,6 +20,7 @@ import com.barchart.util.guice.Component;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 import com.netflix.astyanax.connectionpool.exceptions.ConnectionException;
+import com.netflix.astyanax.model.ConsistencyLevel;
 import com.typesafe.config.Config;
 
 @Component(CassandraStoreProvider.TYPE)
@@ -130,6 +131,14 @@ public class CassandraStoreProvider implements StoreService, StoreLockService {
 		if (common_.hasPath("readBatchSize")) {
 			store_.setReadBatchSize(common_.getInt("readBatchSize"));
 		}
+		
+		if (common_.hasPath("readConsistency")) {
+			store_.setReadConsistency(ConsistencyLevel.valueOf(common_.getString("readConsistency")));
+		}
+		
+		if (common_.hasPath("writeConsistency")) {
+			store_.setWriteConsistency(ConsistencyLevel.valueOf(common_.getString("writeConsistency")));
+		}		
 
 		store_.connect();
 
