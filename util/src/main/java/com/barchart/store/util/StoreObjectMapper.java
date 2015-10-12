@@ -135,8 +135,9 @@ public abstract class StoreObjectMapper {
 		final BatchLoader<R, T> loader =
 				new BatchLoader<R, T>(new RowLoader<R, C, V, T, M>(table, mapper), maxReadBatch);
 
-		if (cache == null)
+		if (cache == null) {
 			return loader.call(keys);
+		}
 
 		return cache.rows(loader, keys);
 
@@ -159,8 +160,9 @@ public abstract class StoreObjectMapper {
 
 		final ColumnKeyLoader<R, C, V, T, M> loader = new ColumnKeyLoader<R, C, V, T, M>(table, mapper, key);
 
-		if (cache == null)
+		if (cache == null) {
 			return loader.call(columns);
+		}
 
 		return cache.columns(loader, key, columns);
 
@@ -184,8 +186,9 @@ public abstract class StoreObjectMapper {
 		final ColumnPrefixLoader<R, String, V, T, M> loader =
 				new ColumnPrefixLoader<R, String, V, T, M>(table, mapper, key, prefix);
 
-		if (cache == null)
+		if (cache == null) {
 			return loader.call();
+		}
 
 		return cache.columnsByPrefix(loader, key, prefix);
 
@@ -210,8 +213,9 @@ public abstract class StoreObjectMapper {
 		final ColumnSliceLoader<R, C, V, T, M> loader =
 				new ColumnSliceLoader<R, C, V, T, M>(table, mapper, key, count, reverse);
 
-		if (cache == null)
+		if (cache == null) {
 			return loader.call();
+		}
 
 		return cache.columns(loader, key, count, reverse);
 
@@ -237,8 +241,9 @@ public abstract class StoreObjectMapper {
 		final ColumnRangeLoader<R, C, V, T, M> loader =
 				new ColumnRangeLoader<R, C, V, T, M>(table, mapper, key, start, end);
 
-		if (cache == null)
+		if (cache == null) {
 			return loader.call();
+		}
 
 		return cache.columns(loader, key, start, end);
 
@@ -538,8 +543,9 @@ public abstract class StoreObjectMapper {
 
 				@Override
 				public void onCompleted() {
-					for (final T item : result)
+					for (final T item : result) {
 						subscriber.onNext(item);
+					}
 					subscriber.onCompleted();
 				}
 
@@ -602,7 +608,7 @@ public abstract class StoreObjectMapper {
 		@Override
 		public Observable<T> call(final K[] keys) {
 
-			if (keys.length <= batchSize) {
+			if (keys == null || keys.length <= batchSize) {
 				return task.call(keys);
 			}
 

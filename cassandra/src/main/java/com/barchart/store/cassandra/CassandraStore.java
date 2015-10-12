@@ -1324,6 +1324,8 @@ public class CassandraStore implements StoreService {
 
 							} catch (final Exception e) {
 
+								e.printStackTrace();
+
 								queryFailed(qct, e);
 
 								subscriber.onError(e);
