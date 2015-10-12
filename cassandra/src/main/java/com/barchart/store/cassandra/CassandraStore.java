@@ -214,32 +214,32 @@ public class CassandraStore implements StoreService {
 
 		writeQueue = writeQueueSize > 0
 				? new LinkedBlockingQueue<Runnable>(writeQueueSize)
-				: new LinkedBlockingQueue<Runnable>();
-		writeExecutor = new ThreadPoolExecutor(writePoolSize, writePoolSize, 60, TimeUnit.SECONDS, writeQueue,
-				new DaemonFactory(), new ThreadPoolExecutor.AbortPolicy());
+						: new LinkedBlockingQueue<Runnable>();
+				writeExecutor = new ThreadPoolExecutor(writePoolSize, writePoolSize, 60, TimeUnit.SECONDS, writeQueue,
+						new DaemonFactory(), new ThreadPoolExecutor.AbortPolicy());
 
-		readQueue = readQueueSize > 0
-				? new LinkedBlockingQueue<Runnable>(readQueueSize)
-				: new LinkedBlockingQueue<Runnable>();
-		readExecutor = new ThreadPoolExecutor(readPoolSize, readPoolSize, 60, TimeUnit.SECONDS, readQueue,
-				new DaemonFactory(), new ThreadPoolExecutor.AbortPolicy());
+				readQueue = readQueueSize > 0
+						? new LinkedBlockingQueue<Runnable>(readQueueSize)
+								: new LinkedBlockingQueue<Runnable>();
+						readExecutor = new ThreadPoolExecutor(readPoolSize, readPoolSize, 60, TimeUnit.SECONDS, readQueue,
+								new DaemonFactory(), new ThreadPoolExecutor.AbortPolicy());
 
-		final Builder builder = new AstyanaxContext.Builder()
-				.forCluster(clusterName)
-				.withAstyanaxConfiguration(new AstyanaxConfigurationImpl()
+						final Builder builder = new AstyanaxContext.Builder()
+						.forCluster(clusterName)
+						.withAstyanaxConfiguration(new AstyanaxConfigurationImpl()
 						.setDiscoveryType(NodeDiscoveryType.RING_DESCRIBE)
 						// https://github.com/Netflix/astyanax/issues/127
 						.setConnectionPoolType(ConnectionPoolType.ROUND_ROBIN)
 						// https://github.com/Netflix/astyanax/issues/127
 						.setCqlVersion("3.0.0")
 						.setTargetCassandraVersion("1.2"))
-				.withConnectionPoolConfiguration(connectionPoolConfig())
-				.withConnectionPoolMonitor(new CountingConnectionPoolMonitor());
+						.withConnectionPoolConfiguration(connectionPoolConfig())
+						.withConnectionPoolMonitor(new CountingConnectionPoolMonitor());
 
-		// get cluster
-		clusterContext = builder.buildCluster(ThriftFamilyFactory.getInstance());
+						// get cluster
+						clusterContext = builder.buildCluster(ThriftFamilyFactory.getInstance());
 
-		clusterContext.start();
+						clusterContext.start();
 
 	}
 
@@ -247,24 +247,24 @@ public class CassandraStore implements StoreService {
 
 		final ConnectionPoolConfigurationImpl config = new ConnectionPoolConfigurationImpl(
 				"barchart_pool")
-				.setSeeds(Joiner.on(",").join(seeds))
-				.setMaxConns(readPoolSize + writePoolSize)
-				.setMaxConnsPerHost(readPoolSize + writePoolSize)
-				.setConnectTimeout(5000)
-				.setSocketTimeout(10000)
-				.setMaxTimeoutCount(10)
-				// This is not a network timeout, but a connection pool
-				// timeout if all connections are in use.
-				.setMaxTimeoutWhenExhausted(30000)
-				// Added those to solidify the connection as I get a
-				// timeout quite often
-				.setLatencyAwareUpdateInterval(10000)
-				// Resort hosts per token partition every 10 seconds
-				.setLatencyAwareResetInterval(10000)
-				.setLatencyAwareBadnessThreshold(2)
-				// Uses last 100 latency samples
-				.setLatencyAwareWindowSize(100)
-				.setAuthenticationCredentials(new SimpleAuthenticationCredentials(user, password));
+		.setSeeds(Joiner.on(",").join(seeds))
+		.setMaxConns(readPoolSize + writePoolSize)
+		.setMaxConnsPerHost(readPoolSize + writePoolSize)
+		.setConnectTimeout(5000)
+		.setSocketTimeout(10000)
+		.setMaxTimeoutCount(10)
+		// This is not a network timeout, but a connection pool
+		// timeout if all connections are in use.
+		.setMaxTimeoutWhenExhausted(30000)
+		// Added those to solidify the connection as I get a
+		// timeout quite often
+		.setLatencyAwareUpdateInterval(10000)
+		// Resort hosts per token partition every 10 seconds
+		.setLatencyAwareResetInterval(10000)
+		.setLatencyAwareBadnessThreshold(2)
+		// Uses last 100 latency samples
+		.setLatencyAwareWindowSize(100)
+		.setAuthenticationCredentials(new SimpleAuthenticationCredentials(user, password));
 
 		if (zone != null) {
 			config.setLocalDatacenter(zone);
@@ -328,7 +328,7 @@ public class CassandraStore implements StoreService {
 			final Table<R, C, V> table) throws ConnectionException {
 
 		clusterContext.getClient().getKeyspace(keyspace)
-				.createColumnFamily(columnFamily(table), getCFOptions(table));
+		.createColumnFamily(columnFamily(table), getCFOptions(table));
 
 	}
 
@@ -337,7 +337,7 @@ public class CassandraStore implements StoreService {
 			final Table<R, C, V> table) throws Exception {
 
 		clusterContext.getClient().getKeyspace(keyspace)
-				.updateColumnFamily(columnFamily(table), getCFOptions(table));
+		.updateColumnFamily(columnFamily(table), getCFOptions(table));
 
 	}
 
@@ -351,7 +351,7 @@ public class CassandraStore implements StoreService {
 	public <R extends Comparable<R>, C extends Comparable<C>, V> void delete(final String keyspace,
 			final Table<R, C, V> table) throws ConnectionException {
 		clusterContext.getClient().getKeyspace(keyspace)
-				.dropColumnFamily(table.name());
+		.dropColumnFamily(table.name());
 	}
 
 	@SuppressWarnings("unchecked")
@@ -416,9 +416,9 @@ public class CassandraStore implements StoreService {
 
 		final ImmutableMap.Builder<String, Object> builder =
 				ImmutableMap.<String, Object> builder()
-						.put("key_validation_class", rowValidator)
-						.put("comparator_type", columnValidator)
-						.put("default_validation_class", valueValidator);
+				.put("key_validation_class", rowValidator)
+				.put("comparator_type", columnValidator)
+				.put("default_validation_class", valueValidator);
 
 		if (table.columns().size() > 0) {
 
@@ -579,7 +579,7 @@ public class CassandraStore implements StoreService {
 
 	public <R extends Comparable<R>, C extends Comparable<C>, V> ObservableQueryBuilder<R, C> fetch(
 			final String database, final Table<R, C, V> table, final ConsistencyLevel level, final R... keys)
-			throws Exception {
+					throws Exception {
 		if (keys == null || keys.length == 0) {
 			return new CassandraAllRowsQuery<R, C>(database, table, level, readExecutor);
 		} else if (keys.length == 1) {
@@ -912,7 +912,7 @@ public class CassandraStore implements StoreService {
 	}
 
 	private abstract class CassandraBaseRowQuery<R extends Comparable<R>, C extends Comparable<C>> implements
-			ObservableQueryBuilder<R, C> {
+	ObservableQueryBuilder<R, C> {
 
 		protected final ColumnFamilyQuery<R, C> query;
 		protected final Executor executor;
@@ -1041,14 +1041,14 @@ public class CassandraStore implements StoreService {
 	}
 
 	private class CassandraSingleRowQuery<R extends Comparable<R>, C extends Comparable<C>> extends
-			CassandraBaseRowQuery<R, C> {
+	CassandraBaseRowQuery<R, C> {
 
 		private final R key;
 
 		private CassandraSingleRowQuery(final String database_,
 				final Table<R, C, ?> table_, final ConsistencyLevel level_,
 				final Executor executor_, final R key_)
-				throws ConnectionException {
+						throws ConnectionException {
 
 			super(database_, table_, level_, executor_);
 			key = key_;
@@ -1121,14 +1121,14 @@ public class CassandraStore implements StoreService {
 	}
 
 	private class CassandraMultiRowQuery<R extends Comparable<R>, C extends Comparable<C>> extends
-			CassandraBaseRowQuery<R, C> {
+	CassandraBaseRowQuery<R, C> {
 
 		private final R[] keys;
 
 		private CassandraMultiRowQuery(final String database_,
 				final Table<R, C, ?> table_, final ConsistencyLevel level_,
 				final Executor executor_, final R... keys_)
-				throws ConnectionException {
+						throws ConnectionException {
 
 			super(database_, table_, level_, executor_);
 			keys = keys_;
@@ -1168,38 +1168,38 @@ public class CassandraStore implements StoreService {
 										batchSize == 0 ? readBatchSize : Math.min(batchSize, readBatchSize);
 
 								outer:
-								for (final R[] batch : batches(keys, realBatchSize)) {
+									for (final R[] batch : batches(keys, realBatchSize)) {
 
-									final RowSliceQuery<R, C> rowQuery = query.getKeySlice(batch);
+										final RowSliceQuery<R, C> rowQuery = query.getKeySlice(batch);
 
-									if (columns != null) {
-										rowQuery.withColumnSlice(columns);
-									} else if (columnRange != null) {
-										rowQuery.withColumnRange(columnRange.build());
-									}
-
-									qct = readStart("keys");
-
-									final OperationResult<Rows<R, C>> result = rowQuery.execute();
-
-									queryFinish(qct, result.getResult().size());
-
-									for (final Row<R, C> row : result.getResult()) {
-
-										if (subscriber.isUnsubscribed()) {
-											return;
+										if (columns != null) {
+											rowQuery.withColumnSlice(columns);
+										} else if (columnRange != null) {
+											rowQuery.withColumnRange(columnRange.build());
 										}
 
-										if (limit > 0 && ct >= limit) {
-											break outer;
+										qct = readStart("keys");
+
+										final OperationResult<Rows<R, C>> result = rowQuery.execute();
+
+										queryFinish(qct, result.getResult().size());
+
+										for (final Row<R, C> row : result.getResult()) {
+
+											if (subscriber.isUnsubscribed()) {
+												return;
+											}
+
+											if (limit > 0 && ct >= limit) {
+												break outer;
+											}
+
+											subscriber.onNext(wrapRow(row));
+											ct++;
+
 										}
 
-										subscriber.onNext(wrapRow(row));
-										ct++;
-
 									}
-
-								}
 
 								subscriber.onCompleted();
 
@@ -1249,7 +1249,7 @@ public class CassandraStore implements StoreService {
 	}
 
 	private class CassandraAllRowsQuery<R extends Comparable<R>, C extends Comparable<C>> extends
-			CassandraBaseRowQuery<R, C> {
+	CassandraBaseRowQuery<R, C> {
 
 		private CassandraAllRowsQuery(final String database_,
 				final Table<R, C, ?> table_, final ConsistencyLevel level_,
@@ -1317,6 +1317,9 @@ public class CassandraStore implements StoreService {
 
 									subscriber.onNext(wrapRow(row));
 									ct++;
+									if (ct % 1000 == 0) {
+										log.info("yz: count is: " + ct);
+									}
 
 								}
 
@@ -1354,7 +1357,7 @@ public class CassandraStore implements StoreService {
 	}
 
 	private class CassandraSearchQuery<R extends Comparable<R>, C extends Comparable<C>> extends
-			CassandraBaseRowQuery<R, C> implements ObservableIndexQueryBuilder<R, C> {
+	CassandraBaseRowQuery<R, C> implements ObservableIndexQueryBuilder<R, C> {
 
 		Map<C, List<ValueCompare>> filters;
 
