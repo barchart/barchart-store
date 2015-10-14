@@ -602,7 +602,7 @@ public abstract class StoreObjectMapper {
 		@Override
 		public Observable<T> call(final K[] keys) {
 
-			if (keys.length <= batchSize) {
+			if (keys == null || keys.length <= batchSize) {
 				return task.call(keys);
 			}
 
